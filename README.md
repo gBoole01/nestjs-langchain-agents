@@ -28,6 +28,14 @@ npm install
 npm run start:dev
 ```
 
+## TODO List
+
+- [ ] Refine prompts
+- [ ] Refine more tools
+- [ ] Add memory
+- [ ] Add orchestrator agent
+- [ ] Add more agents to stock analysis
+
 ## Goal Project Structure
 
 ```text

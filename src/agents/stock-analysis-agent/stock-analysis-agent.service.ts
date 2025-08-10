@@ -64,7 +64,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
       // Initialize the LLM with proper configuration
       const model = new ChatGoogleGenerativeAI({
         apiKey: googleApiKey,
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.0-flash',
         temperature: 0.1, // Lower temperature for more consistent financial analysis
         maxOutputTokens: 8192,
       });

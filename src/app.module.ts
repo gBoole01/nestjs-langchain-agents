@@ -12,8 +12,8 @@ import { SerperWebService } from './tools/serper/serper-web.service';
 import { SerperModule } from './tools/serper/serper.module';
 import { TiingoModule } from './tools/tiingo/tiingo.module';
 import { TiingoService } from './tools/tiingo/tiingo.service';
-import { WebScrapingModule } from './web-scraping/web-scraping.module';
-import { WebScrapingService } from './web-scraping/web-scraping.service';
+import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
+import { WebScrapingService } from './tools/web-scraping/web-scraping.service';
 
 @Module({
   imports: [

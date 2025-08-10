@@ -22,7 +22,7 @@ export class WebScrapingService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    const apiKey = this.configService.get('GOOGLE_API_KEY');
+    const apiKey = this.configService.get('GEMINI_API_KEY');
     this.model = new ChatGoogleGenerativeAI({
       apiKey,
       model: 'gemini-1.5-flash',

@@ -4,12 +4,14 @@ import {
 } from '@langchain/core/prompts';
 import { StructuredToolInterface } from '@langchain/core/tools';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { TavilySearch } from '@langchain/tavily';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
-import { DiscordService } from 'src/discord/discord.service';
-import { FetchStockDataTool } from 'src/tiingo/fetch-stock-data.tool';
+import { DiscordService } from 'src/integrations/discord/discord.service';
+import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
+import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
+import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
+import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
 
 @Injectable()
 export class StockAnalysisAgentService implements OnModuleInit {
@@ -21,6 +23,9 @@ export class StockAnalysisAgentService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly discordService: DiscordService,
     private readonly fetchStockDataTool: FetchStockDataTool,
+    private readonly serperNewsTool: SerperNewsTool,
+    private readonly serperWebTool: SerperWebTool,
+    private readonly webScrapingTool: WebScrapingTool,
   ) {}
 
   async onModuleInit() {
@@ -66,8 +71,11 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
       // Define the tools the agent can use
       const tools: StructuredToolInterface[] = [
-        new TavilySearch({ maxResults: 5, tavilyApiKey }),
+        // new TavilySearch({ maxResults: 5, tavilyApiKey }),
         this.fetchStockDataTool.getTool(),
+        this.serperNewsTool.getTool(),
+        this.serperWebTool.getTool(),
+        this.webScrapingTool.getTool(),
       ];
 
       // Enhanced prompt for financial analysis
@@ -166,8 +174,12 @@ Remember: Stock market data may not be available for weekends, holidays, or date
    */
   private async testAgent(): Promise<void> {
     try {
-      const testQuery =
-        'What are the current stock prices of AAPL, GOOGL, and MSFT on 2025-08-08?';
+      const testQuery = `Provide me a detailed report on Nvidia stocks over the last month?
+      Recent stock performance? (e.g., price changes over the last month, quarter, or year)
+Historical data? (e.g., stock prices from a specific period in the past)
+News and recent events? (e.g., any significant news stories that might affect the stock)
+Financial analysis? (e.g., expert opinions on the stock's potential)
+      `;
       this.logger.log('Testing agent with sample query...');
 
       const result = await this.runAnalysisAgent(testQuery);

@@ -5,7 +5,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cheerio from 'cheerio';
 import puppeteer, { Browser } from 'puppeteer';
-import { WebSearchResult } from '../serper/serper.types';
+import { WebSearchResult } from '../tools/serper/serper.types';
 
 export type EnrichedSearchResult = {
   title: string;

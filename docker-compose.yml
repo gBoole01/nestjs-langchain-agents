@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: stock-analysis-mongodb
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: stockanalysis123
+      MONGO_INITDB_DATABASE: stock_analysis
+    volumes:
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - stock-analysis-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  stock-analysis-network:
+    driver: bridge

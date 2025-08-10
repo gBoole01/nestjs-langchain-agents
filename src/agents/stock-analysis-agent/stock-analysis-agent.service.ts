@@ -61,13 +61,17 @@ export class StockAnalysisAgentService implements OnModuleInit {
         return;
       }
 
-      // Initialize the LLM with proper configuration
       const model = new ChatGoogleGenerativeAI({
         apiKey: googleApiKey,
         model: 'gemini-2.0-flash',
         temperature: 0.1, // Lower temperature for more consistent financial analysis
         maxOutputTokens: 8192,
       });
+      // const model = new Ollama({
+      //   model: 'phi3',
+      //   temperature: 0.1,
+      //   baseUrl: 'http://localhost:11434',
+      // });
 
       // Define the tools the agent can use
       const tools: StructuredToolInterface[] = [
@@ -82,23 +86,42 @@ export class StockAnalysisAgentService implements OnModuleInit {
       const prompt = ChatPromptTemplate.fromMessages([
         [
           'system',
-          `You are a professional financial analyst assistant with access to market data and web search capabilities.
+          `You are a highly skilled and objective financial analyst agent named 'FinBot'.
+Your primary function is to provide comprehensive, data-driven analysis of a given publicly traded company. You will be provided with a single stock ticker symbol and the current date. Your goal is to use the available tools to gather all relevant information and then synthesize it into a structured financial analysis report.
+Your analysis must be grounded in facts, figures, and verifiable news. Avoid speculative language, personal opinions, or any information that cannot be directly sourced from the data you retrieve.
 
-Your capabilities:
-- Fetch historical stock market data using the fetch_stock_market_data tool
-- Search the web for current financial news and information using tavily_search
-- Analyze stock performance, trends, and provide insights
-- Compare multiple stocks and market sectors
+TOOLS:
+fetch_stock_market_data: Use this tool to get historical stock prices and trading volume for the given ticker. You can specify a date range.
+serper_web_search: Use this for general queries about the company, its industry, or its financial reports.
+serper_news_search: Use this to find the most recent news articles related to the ticker. This is crucial for understanding current market sentiment.
+web_scraping_tool: Use this to extract and summarize the full content of a URL you have identified from a search result.
 
-Guidelines:
-- Always use the fetch_stock_market_data tool for specific stock price queries
-- When asked about recent events or news, use web search to get current information
-- Provide clear, data-driven analysis with specific numbers when possible
-- If market data is unavailable for requested dates, explain why (weekends, holidays, etc.)
-- Format financial data clearly with currency symbols and proper number formatting
-- Always cite your data sources when providing analysis
+INSTRUCTIONS:
+Upon receiving a ticker, immediately use the available tools to gather the following information:
+Last closing price, daily high, and daily low.
+Recent trading volume.
+A summary of the most relevant news articles from the last 2-3 weeks.
+General information about the company's recent performance.
+Synthesize the gathered information into a structured report.
+Format your final response using Markdown. It must contain the following three sections in this exact order:
 
-Remember: Stock market data may not be available for weekends, holidays, or dates when markets were closed.`,
+Summary: A brief, high-level overview of the stock's recent performance. Include the latest closing price and a concise explanation of the key factors driving its performance (e.g., earnings report, market trends).
+News Impact: A bulleted list of 3-5 key recent news items. Each bullet point should be a brief, one-sentence summary of the news item and its potential impact on the stock. Use the web_scraping_tool to get the full context of promising news links.
+Sentiment: A single paragraph describing the overall market sentiment toward the stock (e.g., bullish, bearish, neutral). Base this sentiment on the data and news you have retrieved.
+
+Example of desired output structure:
+## [Ticker] Stock Analysis - [Current Date]
+**Summary:**
+...
+**News Impact:**
+* ...
+* ...
+* ...
+**Sentiment:**
+...
+
+You will follow these instructions precisely to deliver a professional, objective, and well-structured financial analysis.
+          `,
         ],
         new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
@@ -174,22 +197,21 @@ Remember: Stock market data may not be available for weekends, holidays, or date
    */
   private async testAgent(): Promise<void> {
     try {
-      const testQuery = `Provide me a detailed report on Nvidia stocks over the last month?
-      Recent stock performance? (e.g., price changes over the last month, quarter, or year)
-Historical data? (e.g., stock prices from a specific period in the past)
-News and recent events? (e.g., any significant news stories that might affect the stock)
-Financial analysis? (e.g., expert opinions on the stock's potential)
-      `;
+      const testQuery = `PLTR ${new Date().toISOString().split('T')[0]}`;
       this.logger.log('Testing agent with sample query...');
 
       const result = await this.runAnalysisAgent(testQuery);
+      if (typeof result === 'string') {
+        await this.discordService.sendToDiscord(
+          `🤖 **Agent Test Result**\n\n**Query:** ${testQuery}\n\n**Response:** ${result}`,
+        );
 
-      // Send result to Discord
-      await this.discordService.sendToDiscord(
-        `🤖 **Agent Test Result**\n\n**Query:** ${testQuery}\n\n**Response:** ${result}`,
-      );
-
-      this.logger.log('Agent test completed successfully');
+        this.logger.log('Agent test completed successfully');
+      } else {
+        throw new Error(
+          `Wrong response type : ${JSON.stringify(result, null, 2)}`,
+        );
+      }
     } catch (error) {
       this.logger.error('Agent test failed:', error.message);
       await this.discordService.sendToDiscord(

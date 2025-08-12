@@ -4,7 +4,11 @@ import { ConfigModule } from '@nestjs/config';
 import { SerperModule } from 'src/tools/serper/serper.module';
 import { WebScrapingModule } from 'src/tools/web-scraping/web-scraping.module';
 import { TiingoModule } from '../../tools/tiingo/tiingo.module';
+import { AgentDebugService } from './agent-debug.service';
+import { DataAnalystAgentService } from './data-analyst-agent.service';
+import { JournalistAgentService } from './journalist-agent.service';
 import { StockAnalysisAgentService } from './stock-analysis-agent.service';
+import { WriterAgentService } from './writer-agent.service';
 
 @Module({
   imports: [
@@ -14,7 +18,13 @@ import { StockAnalysisAgentService } from './stock-analysis-agent.service';
     SerperModule,
     WebScrapingModule,
   ],
-  providers: [StockAnalysisAgentService],
+  providers: [
+    StockAnalysisAgentService,
+    DataAnalystAgentService,
+    JournalistAgentService,
+    WriterAgentService,
+    AgentDebugService,
+  ],
   exports: [StockAnalysisAgentService],
 })
 export class StockAnalysisAgentModule {}

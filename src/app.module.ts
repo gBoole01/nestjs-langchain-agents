@@ -1,8 +1,11 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { DataAnalystAgentService } from './agents/stock-analysis-agent/data-analyst-agent.service';
+import { JournalistAgentService } from './agents/stock-analysis-agent/journalist-agent.service';
 import { StockAnalysisAgentModule } from './agents/stock-analysis-agent/stock-analysis-agent.module';
 import { StockAnalysisAgentService } from './agents/stock-analysis-agent/stock-analysis-agent.service';
+import { WriterAgentService } from './agents/stock-analysis-agent/writer-agent.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DiscordModule } from './integrations/discord/discord.module';
@@ -34,6 +37,9 @@ import { WebScrapingService } from './tools/web-scraping/web-scraping.service';
     WebScrapingService,
     TiingoService,
     StockAnalysisAgentService,
+    DataAnalystAgentService,
+    JournalistAgentService,
+    WriterAgentService,
   ],
 })
 export class AppModule {}

@@ -30,11 +30,10 @@ npm run start:dev
 
 ## TODO List
 
-- [ ] Refine prompts
-- [ ] Refine more tools
+- [x] Refine prompts
 - [ ] Add memory
-- [ ] Add orchestrator agent
-- [ ] Add more agents to stock analysis
+- [x] Add orchestrator agent
+- [x] Add more agents to stock analysis
 
 ## Goal Project Structure
 

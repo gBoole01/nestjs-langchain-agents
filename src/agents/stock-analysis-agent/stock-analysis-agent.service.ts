@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { DiscordService } from 'src/integrations/discord/discord.service';
 import { DataAnalystAgentService } from './data-analyst-agent.service';
 import { JournalistAgentService } from './journalist-agent.service';
@@ -8,6 +9,7 @@ import { WriterAgentService } from './writer-agent.service';
 @Injectable()
 export class StockAnalysisAgentService implements OnModuleInit {
   private readonly logger = new Logger(StockAnalysisAgentService.name);
+  private readonly tickers = ['PLTR', 'NVDA', 'TSLA'];
 
   constructor(
     private readonly dataAnalystAgent: DataAnalystAgentService,
@@ -19,9 +21,14 @@ export class StockAnalysisAgentService implements OnModuleInit {
   async onModuleInit() {
     this.logger.log('Orchestrator Agent initialized');
 
-    await this.runAgent('PLTR');
-    await this.runAgent('NVDA');
-    await this.runAgent('TSLA');
+    await this.runAnalysisForTickers(this.tickers);
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_8AM)
+  async runAnalysisForTickers(tickers: string[]) {
+    for (const ticker of tickers) {
+      await this.runAgent(ticker);
+    }
   }
 
   async runAgent(ticker: string): Promise<void> {

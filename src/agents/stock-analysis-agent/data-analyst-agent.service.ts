@@ -77,8 +77,9 @@ Your goal is to provide a professional, data-driven report based on factual info
         agent,
         tools,
         maxIterations: 8,
-        verbose: true, // Enable verbose logging to see tool calls
-        returnIntermediateSteps: true, // Return tool call details
+        verbose: this.configService.get('NODE_ENV') === 'development',
+        returnIntermediateSteps:
+          this.configService.get('NODE_ENV') === 'development',
       });
 
       this.isInitialized = true;

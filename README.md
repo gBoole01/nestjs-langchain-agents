@@ -31,7 +31,7 @@ npm run start:dev
 ## TODO List
 
 - [x] Refine prompts
-- [ ] Add memory
+- [x] Add basic memory
 - [x] Add orchestrator agent
 - [x] Add more agents to stock analysis
 

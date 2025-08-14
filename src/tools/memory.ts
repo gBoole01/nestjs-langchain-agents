@@ -6,7 +6,8 @@ export async function getMemory(ticker: string) {
   try {
     const data = await fs.readFile(MEMORY_FILE, 'utf-8');
     const memory = JSON.parse(data);
-    return memory[ticker] || {};
+    const entry = memory[`stock_analysis_${ticker.toUpperCase()}`];
+    return entry || {};
   } catch (error: any) {
     if ('code' in error && error.code === 'ENOENT') {
       return {}; // Return empty object if file doesn't exist

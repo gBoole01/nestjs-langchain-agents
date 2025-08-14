@@ -72,7 +72,7 @@ export class JournalistAgentService implements OnModuleInit {
         ['human', '{input}'],
       ]);
 
-      const agent = await createToolCallingAgent({ llm: model, tools, prompt });
+      const agent = createToolCallingAgent({ llm: model, tools, prompt });
       this.agentExecutor = new AgentExecutor({
         agent,
         tools,

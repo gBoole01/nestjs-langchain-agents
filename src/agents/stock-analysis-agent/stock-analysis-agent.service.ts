@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DiscordService } from 'src/integrations/discord/discord.service';
 import { getMemory, saveMemory } from 'src/tools/memory';
+import { CriticAgentService } from './critic-agent.service';
 import { DataAnalystAgentService } from './data-analyst-agent.service';
 import { JournalistAgentService } from './journalist-agent.service';
 import { AnalysisRequest } from './stock-analysis-agent.types';
@@ -14,6 +15,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
     private readonly dataAnalystAgent: DataAnalystAgentService,
     private readonly journalistAgent: JournalistAgentService,
     private readonly writerAgent: WriterAgentService,
+    private readonly criticAgent: CriticAgentService,
     private readonly discordService: DiscordService,
   ) {}
 
@@ -76,28 +78,69 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
       this.logger.log('Data and news analysis completed successfully');
 
-      // Step 2: Generate final report
-      const reportResult = await this.writerAgent.writeReport(
-        ticker,
-        date,
-        dataResult.data,
-        newsResult.data,
-        memory,
-      );
+      // Step 3: Generate final report and submit to Critic Agent
+      let finalReport = '';
+      let critiqueVerdict: { verdict: 'PASS' | 'FAIL'; feedback?: string } = {
+        verdict: 'FAIL',
+      };
+      let iterationCount = 0;
+      const MAX_ITERATIONS = 3;
 
-      if (!reportResult.success) {
-        throw new Error(`Report generation failed: ${reportResult.error}`);
+      while (
+        critiqueVerdict.verdict === 'FAIL' &&
+        iterationCount < MAX_ITERATIONS
+      ) {
+        iterationCount++;
+
+        // Call the Writer Agent
+        const writerResult = await this.writerAgent.writeReport(
+          ticker,
+          date,
+          dataResult.data,
+          newsResult.data,
+          memory,
+          critiqueVerdict.feedback,
+        );
+
+        if (!writerResult.success) {
+          throw new Error(`Report generation failed: ${writerResult.error}`);
+        }
+        const report = writerResult.data;
+        this.logger.log(
+          `Writer Agent produced draft (Iteration ${iterationCount}):\n${report}`,
+        );
+
+        // Call the Critic Agent to evaluate the report
+        critiqueVerdict = await this.criticAgent.critiqueReport(
+          report,
+          dataResult.data,
+          newsResult.data,
+          memory,
+        );
+
+        if (critiqueVerdict.verdict === 'PASS') {
+          finalReport = report;
+          this.logger.log(
+            `Critic Agent passed the report after ${iterationCount} iterations.`,
+          );
+        } else {
+          this.logger.warn(
+            `Critic Agent failed the report. Feedback: ${critiqueVerdict.feedback}`,
+          );
+        }
+      }
+
+      if (critiqueVerdict.verdict === 'FAIL') {
+        this.logger.error(
+          'Report failed to pass critique after maximum iterations.',
+        );
+        throw new Error('Report could not be finalized due to quality issues.');
       }
 
       this.logger.log('Complete analysis finished successfully');
-      await saveMemory(memoryKey, reportResult.data);
+      await saveMemory(memoryKey, finalReport);
 
-      // Send to Discord if available
-      await this.discordService.sendToDiscord(
-        `📊 **Multi-Agent Analysis Complete**\n\n**Ticker:** ${ticker}\n\n${reportResult.data}`,
-      );
-
-      return reportResult.data;
+      return finalReport;
     } catch (error) {
       this.logger.error('Complete analysis failed:', error.message);
 

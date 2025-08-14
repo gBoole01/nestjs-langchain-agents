@@ -1,6 +1,7 @@
 import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CriticAgentService } from './agents/stock-analysis-agent/critic-agent.service';
 import { DataAnalystAgentService } from './agents/stock-analysis-agent/data-analyst-agent.service';
 import { JournalistAgentService } from './agents/stock-analysis-agent/journalist-agent.service';
 import { StockAnalysisAgentModule } from './agents/stock-analysis-agent/stock-analysis-agent.module';
@@ -40,6 +41,7 @@ import { WebScrapingService } from './tools/web-scraping/web-scraping.service';
     DataAnalystAgentService,
     JournalistAgentService,
     WriterAgentService,
+    CriticAgentService,
   ],
 })
 export class AppModule {}

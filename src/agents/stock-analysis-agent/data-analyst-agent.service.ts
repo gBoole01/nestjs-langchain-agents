@@ -72,7 +72,7 @@ Your goal is to provide a professional, data-driven report based on factual info
         ['human', '{input}'],
       ]);
 
-      const agent = await createToolCallingAgent({ llm: model, tools, prompt });
+      const agent = createToolCallingAgent({ llm: model, tools, prompt });
       this.agentExecutor = new AgentExecutor({
         agent,
         tools,

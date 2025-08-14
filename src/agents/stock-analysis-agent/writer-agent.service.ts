@@ -35,39 +35,44 @@ export class WriterAgentService implements OnModuleInit {
       const model = new ChatGoogleGenerativeAI({
         apiKey: googleApiKey,
         model: 'gemini-2.0-flash',
-        temperature: 0.4, // Higher for better writing quality
+        temperature: 0.5,
         maxOutputTokens: 8192,
       });
 
       const prompt = ChatPromptTemplate.fromMessages([
         [
           'system',
-          `You are a professional financial writer specializing in creating clear, concise, and objective stock analysis reports. Your goal is to translate raw data and insights from other agents into a polished, easy-to-read report for a general audience.
+          `You are a professional financial journalist tasked with writing a comprehensive report for a stock.
+          Your report must be:
+          -   Objective and factual, based only on the provided data.
+          -   Well-structured with clear headings.
+          -   Easy to read for a non-expert audience.
+          -   Insightful, explaining the "why" behind the market movements.
 
-**Your Task:**
-1.  **Synthesize:** Combine the provided data analysis and news analysis into a single, coherent narrative.
-2.  **Structure:** Format the final output into a professional report with the following sections, using clear headings:
-    -   **Executive Summary:** A brief, high-level overview of the stock's recent performance and key takeaways.
-    -   **Technical Analysis:** Insights derived from the price action, volume, and identified trends.
-    -   **Market Activity & News Impact:** An assessment of significant news, market sentiment, and how they influenced the stock.
-    -   **Conclusion:** A final summary of the overall assessment.
-3.  **Style:** Write in a formal but accessible tone. Avoid technical jargon where possible, or explain it simply. Do not add any new information not present in the provided analysis. Ensure your tone is objective and factual.`,
+          Report Structure:
+          -   **Executive Summary:** A brief, punchy summary of the stock's recent performance.
+          -   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
+          -   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
+          -   **Conclusion:** Provide a final, balanced assessment.
+
+          You will be provided with technical data, news analysis, and a previous report for context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
+          `,
         ],
         new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
       ]);
 
-      const agent = await createToolCallingAgent({
+      const agent = createToolCallingAgent({
         llm: model,
         tools: [],
         prompt,
       });
-
       this.agentExecutor = new AgentExecutor({
         agent,
         tools: [],
-        maxIterations: 3,
-        verbose: false,
+        verbose: this.configService.get('NODE_ENV') === 'development',
+        returnIntermediateSteps:
+          this.configService.get('NODE_ENV') === 'development',
       });
 
       this.isInitialized = true;
@@ -78,12 +83,23 @@ export class WriterAgentService implements OnModuleInit {
     }
   }
 
+  /**
+   * Generates or revises a financial report based on new data and previous memory.
+   * @param ticker The stock ticker symbol.
+   * @param date The current date of the analysis.
+   * @param dataAnalysis The technical data analysis result.
+   * @param newsAnalysis The news and sentiment analysis result.
+   * @param memory The previous report memory for context.
+   * @param feedback Optional feedback from a critic to revise the report.
+   * @returns An AgentResult containing the generated report or an error.
+   */
   async writeReport(
     ticker: string,
     date: string,
     dataAnalysis: DataAnalysisResult,
     newsAnalysis: NewsAnalysisResult,
     memory: Record<string, any>,
+    feedback?: string,
   ): Promise<AgentResult> {
     try {
       if (!this.isInitialized || !this.agentExecutor) {
@@ -93,7 +109,7 @@ export class WriterAgentService implements OnModuleInit {
         }
       }
 
-      const input = `
+      let input = `
 Create a comprehensive financial analysis report for ticker ${ticker} as of ${date}.
 
 Use the following information as your source:
@@ -106,15 +122,17 @@ ${JSON.stringify(newsAnalysis, null, 2)}
 
 ### Previous Analysis Memory:
 ${JSON.stringify(memory, null, 2)}
-
-**Report Structure:**
--   **Executive Summary:** Start with a brief, punchy summary.
--   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
--   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
--   **Conclusion:** Provide a final, balanced assessment.
-
-Your report must be based exclusively on the provided data. Do not make up any facts or figures.
 `;
+
+      if (feedback) {
+        input += `
+### Revision Feedback:
+Your previous draft was not satisfactory. Please revise your report based on the following feedback:
+"${feedback}"
+
+Ensure you address all points and resubmit a high-quality, final report.
+`;
+      }
 
       const result = await this.agentExecutor.invoke({ input });
 

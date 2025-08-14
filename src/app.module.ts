@@ -43,7 +43,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
         let extraArgs = '';
         let dbConnectionURL = '';
         if (MONGO_PROTOCOL === 'mongodb+srv') {
-          extraArgs = `?retryWrites=true&w=majority&appName=${MONGO_APP_NAME}`;
+          extraArgs = `?w=majority&appName=${MONGO_APP_NAME}`;
           dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
         } else if (MONGO_PROTOCOL === 'mongodb') {
           if (MONGO_PORT === '') {

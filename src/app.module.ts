@@ -20,9 +20,8 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
         const logger = new Logger('MongooseModule');
         const MONGO_USERNAME = configService.get<string>('MONGO_USERNAME');
         const MONGO_PASSWORD = configService.get<string>('MONGO_PASSWORD');
-        const MONGO_INITDB_DATABASE = configService.get<string>(
-          'MONGO_INITDB_DATABASE',
-        );
+        const MONGO_INITDB_DATABASE =
+          configService.get<string>('MONGO_INITDB_DATABASE') ?? '';
         const MONGO_HOST = configService.get<string>('MONGO_HOST');
         const MONGO_PORT = configService.get<string>('MONGO_PORT') ?? '';
         const MONGO_PROTOCOL = configService.get<string>('MONGO_PROTOCOL');
@@ -31,8 +30,8 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
         if (
           !MONGO_USERNAME ||
           !MONGO_PASSWORD ||
-          !MONGO_INITDB_DATABASE ||
-          !MONGO_HOST
+          !MONGO_HOST ||
+          !MONGO_PROTOCOL
         ) {
           logger.error(
             'Missing MongoDB connection environment variables! Please check your .env file.',
@@ -44,7 +43,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
         let dbConnectionURL = '';
         if (MONGO_PROTOCOL === 'mongodb+srv') {
           extraArgs = `?w=majority&appName=${MONGO_APP_NAME}`;
-          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
+          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/?${extraArgs}`;
         } else if (MONGO_PROTOCOL === 'mongodb') {
           if (MONGO_PORT === '') {
             logger.error(
@@ -52,8 +51,14 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
             );
             throw new Error('MongoDB port configuration missing.');
           }
+          if (MONGO_INITDB_DATABASE === '') {
+            logger.error(
+              'Missing MongoDB database environment variable! Please check your .env file.',
+            );
+            throw new Error('MongoDB database name configuration missing.');
+          }
           extraArgs = '?authSource=admin';
-          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
+          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
         } else {
           throw new Error('Invalid value for MONGO_PROTOCOL.');
         }

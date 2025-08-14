@@ -10,7 +10,7 @@ import {
   AgentResult,
   DataAnalysisResult,
   NewsAnalysisResult,
-} from './stock-analysis-agent.types';
+} from '../stock-analysis-agent.types';
 
 @Injectable()
 export class WriterAgentService implements OnModuleInit {
@@ -99,7 +99,7 @@ export class WriterAgentService implements OnModuleInit {
     date: string,
     dataAnalysis: DataAnalysisResult,
     newsAnalysis: NewsAnalysisResult,
-    memory: Record<string, any>,
+    archivistReport: string,
     feedback?: string,
   ): Promise<AgentResult> {
     try {
@@ -121,8 +121,8 @@ ${JSON.stringify(dataAnalysis, null, 2)}
 ### News and Sentiment Analysis:
 ${JSON.stringify(newsAnalysis, null, 2)}
 
-### Previous Analysis Memory:
-${JSON.stringify(memory, null, 2)}
+### Archivist Report :
+${archivistReport}
 `;
 
       if (feedback) {

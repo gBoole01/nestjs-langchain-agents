@@ -33,7 +33,13 @@ npm run start:dev
 - [x] Refine prompts
 - [x] Add basic memory
 - [x] Add orchestrator agent
-- [x] Add more agents to stock analysis
+- [x] Add data analyst agent to stock analysis
+- [x] Add journalist agent to stock analysis
+- [x] Add writer agent to stock analysis
+- [x] Add critic agent to stock analysis
+- [x] Add agent debug service
+- [x] Add enhanced memory
+- [x] Add archivist agent to stock analysis
 
 ## Goal Project Structure
 

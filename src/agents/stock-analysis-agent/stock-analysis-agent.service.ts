@@ -1,11 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DiscordService } from 'src/integrations/discord/discord.service';
-import { getMemory, saveMemory } from 'src/tools/memory';
-import { CriticAgentService } from './critic-agent.service';
-import { DataAnalystAgentService } from './data-analyst-agent.service';
-import { JournalistAgentService } from './journalist-agent.service';
+import { ArchivistAgentService } from './crew/archivist-agent.service'; // Import the new Archivist Agent
+import { CriticAgentService } from './crew/critic-agent.service';
+import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
+import { JournalistAgentService } from './crew/journalist-agent.service';
+import { WriterAgentService } from './crew/writer-agent.service';
 import { AnalysisRequest } from './stock-analysis-agent.types';
-import { WriterAgentService } from './writer-agent.service';
 
 @Injectable()
 export class StockAnalysisAgentService implements OnModuleInit {
@@ -16,6 +16,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
     private readonly journalistAgent: JournalistAgentService,
     private readonly writerAgent: WriterAgentService,
     private readonly criticAgent: CriticAgentService,
+    private readonly archivistAgent: ArchivistAgentService, // Inject the new Archivist Agent
     private readonly discordService: DiscordService,
   ) {}
 
@@ -54,15 +55,16 @@ export class StockAnalysisAgentService implements OnModuleInit {
   async runCompleteAnalysis(ticker: string): Promise<string> {
     const date = new Date().toISOString().split('T')[0];
 
-    const memoryKey = `stock_analysis_${ticker.toUpperCase()}`;
-
-    const memory = await getMemory(ticker);
-    const request: AnalysisRequest = { ticker, date, memory };
-
     try {
       this.logger.log(`Starting complete analysis for ${ticker}`);
 
-      // Step 1: Run data analysis and news analysis in parallel
+      // Step 1: Call the Archivist to get a synthesized memory of past reports
+      const archivistReport =
+        await this.archivistAgent.getInformedOpinion(ticker);
+      const request: AnalysisRequest = { ticker, date, archivistReport };
+      this.logger.log(`Archivist provided report: ${archivistReport}`);
+
+      // Step 2: Run data analysis and news analysis in parallel
       const [dataResult, newsResult] = await Promise.all([
         this.dataAnalystAgent.analyzeData(request),
         this.journalistAgent.analyzeNews(request),
@@ -99,7 +101,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
           date,
           dataResult.data,
           newsResult.data,
-          memory,
+          archivistReport,
           critiqueVerdict.feedback,
         );
 
@@ -116,7 +118,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
           report,
           dataResult.data,
           newsResult.data,
-          memory,
+          archivistReport,
         );
 
         if (critiqueVerdict.verdict === 'PASS') {
@@ -132,14 +134,17 @@ export class StockAnalysisAgentService implements OnModuleInit {
         }
       }
 
+      // Step 4: Save the final report and return it
       if (critiqueVerdict.verdict === 'FAIL') {
         this.logger.warn(
-          'Report failed to pass critique after max iterations, sending the final draft.',
+          'Report failed to pass critique after max iterations, saving the final draft to memory.',
         );
-        await saveMemory(memoryKey, currentDraft);
+        // Save the last draft, even if it failed the critique
+        await this.archivistAgent.saveReport(ticker, currentDraft);
         return currentDraft;
       } else {
-        await saveMemory(memoryKey, finalReport);
+        // Save the successful report to the database
+        await this.archivistAgent.saveReport(ticker, finalReport);
         return finalReport;
       }
     } catch (error) {

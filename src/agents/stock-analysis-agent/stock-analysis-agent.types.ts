@@ -8,7 +8,7 @@ export interface AgentResult {
 export interface AnalysisRequest {
   ticker: string;
   date: string;
-  memory: Record<string, any>;
+  archivistReport?: string;
   additionalContext?: string;
 }
 

@@ -3,9 +3,6 @@
 /node_modules
 /build
 
-# Memory file
-memory.json
-
 # Logs
 logs
 *.log

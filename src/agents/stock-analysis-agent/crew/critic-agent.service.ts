@@ -77,7 +77,7 @@ export class CriticAgentService implements OnModuleInit {
     report: string,
     dataAnalysis: any,
     newsAnalysis: any,
-    memory: Record<string, any>,
+    archivistReport: string,
   ): Promise<{ verdict: 'PASS' | 'FAIL'; feedback?: string }> {
     if (!this.isInitialized || !this.agentExecutor) {
       await this.initializeAgent();
@@ -98,8 +98,8 @@ export class CriticAgentService implements OnModuleInit {
       ### Original News Analysis:
       ${JSON.stringify(newsAnalysis, null, 2)}
       
-      ### Previous Analysis Memory:
-      ${JSON.stringify(memory, null, 2)}
+      ### Archivist Report:
+      ${archivistReport}
 
       Based on your review, provide a verdict ('PASS' or 'REVISE') and detailed feedback.
     `;

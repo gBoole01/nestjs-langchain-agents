@@ -5,19 +5,19 @@ services:
     container_name: stock-analysis-mongodb
     restart: unless-stopped
     ports:
-      - '27017:27017'
+      - '${MONGO_PORT}:${MONGO_PORT}'
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: stockanalysis123
-      MONGO_INITDB_DATABASE: stock_analysis
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
     volumes:
-      - ./mongo-init:/docker-entrypoint-initdb.d
+      - mongodb_data:/data/db
+        - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
     networks:
       - stock-analysis-network
 
 volumes:
   mongodb_data:
-    driver: local
 
 networks:
   stock-analysis-network:

@@ -10,7 +10,7 @@ import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
 import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
-import { AgentResult, AnalysisRequest } from './stock-analysis-agent.types';
+import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 
 @Injectable()
 export class JournalistAgentService implements OnModuleInit {
@@ -106,9 +106,9 @@ export class JournalistAgentService implements OnModuleInit {
       const query = `
 Perform a thorough news and sentiment analysis for ticker ${request.ticker} as of ${request.date}.
 
-Your previous analysis memory MUST be used to inform your analysis. Do not invent news stories or analysis.
-Here is the previous analysis memory:
-${JSON.stringify(request.memory, null, 2)}
+The archivist report MUST be used to inform your analysis. Do not invent news stories or analysis.
+Here is the archivist report:
+${request.archivistReport}
 
 
 Follow these steps precisely:

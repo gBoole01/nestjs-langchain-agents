@@ -28,10 +28,12 @@
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/mongoose": "^11.0.3",
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^6.0.0",
     "cheerio": "^1.1.0",
     "langchain": "^0.3.30",
+    "mongoose": "^8.17.1",
     "puppeteer": "^24.16.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1"

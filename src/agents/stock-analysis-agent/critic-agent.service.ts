@@ -22,6 +22,7 @@ export class CriticAgentService implements OnModuleInit {
   private async initializeAgent(): Promise<void> {
     try {
       const googleApiKey = this.configService.get<string>('GEMINI_API_KEY');
+      const geminiModel = this.configService.get<string>('GEMINI_MODEL');
       if (!googleApiKey) {
         this.logger.error('GEMINI_API_KEY is not set');
         return;
@@ -29,7 +30,7 @@ export class CriticAgentService implements OnModuleInit {
 
       const model = new ChatGoogleGenerativeAI({
         apiKey: googleApiKey,
-        model: 'gemini-2.0-flash',
+        model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
       });

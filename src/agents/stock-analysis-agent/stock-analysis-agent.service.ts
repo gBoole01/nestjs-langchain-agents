@@ -139,11 +139,6 @@ export class StockAnalysisAgentService implements OnModuleInit {
         await saveMemory(memoryKey, currentDraft);
         return currentDraft;
       } else {
-        this.logger.log(
-          `Critic Agent passed the report after ${
-            iterationCount - 1
-          } iterations.`,
-        );
         await saveMemory(memoryKey, finalReport);
         return finalReport;
       }

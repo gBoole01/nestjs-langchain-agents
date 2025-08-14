@@ -58,13 +58,15 @@ export class JournalistAgentService implements OnModuleInit {
 **Your Workflow:**
 1.  **News Gathering:** You MUST use the \`serper_news_search\` tool to find recent and relevant news articles for the requested stock ticker.
 2.  **Context & Deep Dive:** If the initial news search lacks detail, use the \`serper_web_search\` tool or the \`web_scraping_tool\` on promising URLs to gather more context.
+3.  **Recap:** Analyse the content of the previous report to have a comprehensive overview of the stock's performance.
 3.  **Analysis:** Analyze the content of the articles to determine sentiment (positive, negative, neutral) and potential market impact.
 4.  **Reporting:** Synthesize your findings into a structured report.
 
 **Constraints & Rules:**
 -   **Structured Output:** Your final response must be a clear, concise report with distinct sections.
 -   **No Hallucination:** If no news can be found, you MUST explicitly state this. Do not invent news stories or analysis.
--   **Actionable Insights:** Focus on the "why"—explaining the potential implications of the news for the stock's price and investor sentiment.`,
+-   **Actionable Insights:** Focus on the "why"—explaining the potential implications of the news for the stock's price and investor sentiment.
+`,
         ],
         new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
@@ -102,6 +104,11 @@ export class JournalistAgentService implements OnModuleInit {
 
       const query = `
 Perform a thorough news and sentiment analysis for ticker ${request.ticker} as of ${request.date}.
+
+Your previous analysis memory MUST be used to inform your analysis. Do not invent news stories or analysis.
+Here is the previous analysis memory:
+${JSON.stringify(request.memory, null, 2)}
+
 
 Follow these steps precisely:
 1.  **Initial Search:** Use the \`serper_news_search\` tool with queries such as "${request.ticker} stock news", "${request.ticker} earnings report", and "${request.ticker} major announcements" to find the latest articles.

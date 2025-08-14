@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { DiscordService } from 'src/integrations/discord/discord.service';
+import { getMemory, saveMemory } from 'src/tools/memory';
 import { DataAnalystAgentService } from './data-analyst-agent.service';
 import { JournalistAgentService } from './journalist-agent.service';
 import { AnalysisRequest } from './stock-analysis-agent.types';
@@ -9,7 +9,6 @@ import { WriterAgentService } from './writer-agent.service';
 @Injectable()
 export class StockAnalysisAgentService implements OnModuleInit {
   private readonly logger = new Logger(StockAnalysisAgentService.name);
-  private readonly tickers = ['PLTR', 'NVDA', 'TSLA'];
 
   constructor(
     private readonly dataAnalystAgent: DataAnalystAgentService,
@@ -20,11 +19,8 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
   async onModuleInit() {
     this.logger.log('Orchestrator Agent initialized');
-
-    await this.runAnalysisForTickers(this.tickers);
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_8AM)
   async runAnalysisForTickers(tickers: string[]) {
     for (const ticker of tickers) {
       await this.runAgent(ticker);
@@ -55,7 +51,11 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
   async runCompleteAnalysis(ticker: string): Promise<string> {
     const date = new Date().toISOString().split('T')[0];
-    const request: AnalysisRequest = { ticker, date };
+
+    const memoryKey = `stock_analysis_${ticker.toUpperCase()}`;
+
+    const memory = await getMemory(ticker);
+    const request: AnalysisRequest = { ticker, date, memory };
 
     try {
       this.logger.log(`Starting complete analysis for ${ticker}`);
@@ -82,6 +82,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
         date,
         dataResult.data,
         newsResult.data,
+        memory,
       );
 
       if (!reportResult.success) {
@@ -89,6 +90,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
       }
 
       this.logger.log('Complete analysis finished successfully');
+      await saveMemory(memoryKey, reportResult.data);
 
       // Send to Discord if available
       await this.discordService.sendToDiscord(

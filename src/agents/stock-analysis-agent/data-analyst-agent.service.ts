@@ -118,6 +118,9 @@ Follow these steps precisely:
     -   **Market Activity:** Observations on trading volume.
     -   **Technical Observations:** Insights on price trends and support/resistance levels.
 
+Here is the previous analysis memory:
+${JSON.stringify(request.memory, null, 2)}
+
 You MUST NOT provide any analysis if the tool call fails.`;
 
       this.logger.log(`Executing data analysis query: ${query}`);

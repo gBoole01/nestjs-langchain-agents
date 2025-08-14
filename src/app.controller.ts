@@ -1,12 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
+import { StockAnalysisAgentService } from './agents/stock-analysis-agent/stock-analysis-agent.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly stockAnalysisAgentService: StockAnalysisAgentService,
+  ) {}
 
   @Get()
-  getHello(): string {
-    return this.appService.getHello();
+  async runAnalysis(): Promise<void> {
+    const tickers = ['PLTR', 'NVDA', 'TSLA'];
+    await this.stockAnalysisAgentService.runAnalysisForTickers(tickers);
   }
 }

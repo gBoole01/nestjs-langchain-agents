@@ -83,6 +83,7 @@ export class WriterAgentService implements OnModuleInit {
     date: string,
     dataAnalysis: DataAnalysisResult,
     newsAnalysis: NewsAnalysisResult,
+    memory: Record<string, any>,
   ): Promise<AgentResult> {
     try {
       if (!this.isInitialized || !this.agentExecutor) {
@@ -102,6 +103,9 @@ ${JSON.stringify(dataAnalysis, null, 2)}
 
 ### News and Sentiment Analysis:
 ${JSON.stringify(newsAnalysis, null, 2)}
+
+### Previous Analysis Memory:
+${JSON.stringify(memory, null, 2)}
 
 **Report Structure:**
 -   **Executive Summary:** Start with a brief, punchy summary.

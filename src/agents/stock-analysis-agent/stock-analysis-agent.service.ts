@@ -80,11 +80,12 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
       // Step 3: Generate final report and submit to Critic Agent
       let finalReport = '';
+      let currentDraft = '';
       let critiqueVerdict: { verdict: 'PASS' | 'FAIL'; feedback?: string } = {
         verdict: 'FAIL',
       };
       let iterationCount = 0;
-      const MAX_ITERATIONS = 3;
+      const MAX_ITERATIONS = 5;
 
       while (
         critiqueVerdict.verdict === 'FAIL' &&
@@ -124,6 +125,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
             `Critic Agent passed the report after ${iterationCount} iterations.`,
           );
         } else {
+          currentDraft = report;
           this.logger.warn(
             `Critic Agent failed the report. Feedback: ${critiqueVerdict.feedback}`,
           );
@@ -131,16 +133,20 @@ export class StockAnalysisAgentService implements OnModuleInit {
       }
 
       if (critiqueVerdict.verdict === 'FAIL') {
-        this.logger.error(
-          'Report failed to pass critique after maximum iterations.',
+        this.logger.warn(
+          'Report failed to pass critique after max iterations, sending the final draft.',
         );
-        throw new Error('Report could not be finalized due to quality issues.');
+        await saveMemory(memoryKey, currentDraft);
+        return currentDraft;
+      } else {
+        this.logger.log(
+          `Critic Agent passed the report after ${
+            iterationCount - 1
+          } iterations.`,
+        );
+        await saveMemory(memoryKey, finalReport);
+        return finalReport;
       }
-
-      this.logger.log('Complete analysis finished successfully');
-      await saveMemory(memoryKey, finalReport);
-
-      return finalReport;
     } catch (error) {
       this.logger.error('Complete analysis failed:', error.message);
 

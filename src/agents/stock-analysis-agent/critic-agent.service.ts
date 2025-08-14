@@ -86,13 +86,10 @@ export class CriticAgentService implements OnModuleInit {
     }
 
     const input = `
-      Please critique the following financial report based on the provided data.
+      Please provide a constructive review of the following financial report. Evaluate its accuracy, clarity, and adherence to the source data.
 
       ### Report to Review:
       ${report}
-
-      ### Previous Analysis Memory:
-      ${JSON.stringify(memory, null, 2)}
 
       ### Original Data Analysis:
       ${JSON.stringify(dataAnalysis, null, 2)}
@@ -100,7 +97,10 @@ export class CriticAgentService implements OnModuleInit {
       ### Original News Analysis:
       ${JSON.stringify(newsAnalysis, null, 2)}
       
-      Review the report and provide your verdict and feedback.
+      ### Previous Analysis Memory:
+      ${JSON.stringify(memory, null, 2)}
+
+      Based on your review, provide a verdict ('PASS' or 'REVISE') and detailed feedback.
     `;
 
     const result = await this.agentExecutor.invoke({ input });

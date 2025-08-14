@@ -9,6 +9,7 @@ export class AppController {
 
   @Get()
   async runAnalysis(): Promise<void> {
+    // const tickers = ['PLTR']; // Consume less API calls in development
     const tickers = ['PLTR', 'NVDA', 'TSLA'];
     await this.stockAnalysisAgentService.runAnalysisForTickers(tickers);
   }

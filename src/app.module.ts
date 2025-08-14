@@ -43,7 +43,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
         let dbConnectionURL = '';
         if (MONGO_PROTOCOL === 'mongodb+srv') {
           extraArgs = `?w=majority&appName=${MONGO_APP_NAME}`;
-          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/?${extraArgs}`;
+          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}/${extraArgs}`;
         } else if (MONGO_PROTOCOL === 'mongodb') {
           if (MONGO_PORT === '') {
             logger.error(
@@ -58,7 +58,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
             throw new Error('MongoDB database name configuration missing.');
           }
           extraArgs = '?authSource=admin';
-          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
+          dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_INITDB_DATABASE}${extraArgs}`;
         } else {
           throw new Error('Invalid value for MONGO_PROTOCOL.');
         }

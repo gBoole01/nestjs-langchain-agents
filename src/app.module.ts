@@ -24,14 +24,15 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
           'MONGO_INITDB_DATABASE',
         );
         const MONGO_HOST = configService.get<string>('MONGO_HOST');
-        const MONGO_PORT = configService.get<string>('MONGO_PORT');
+        const MONGO_PORT = configService.get<string>('MONGO_PORT') ?? '';
+        const MONGO_PROTOCOL = configService.get<string>('MONGO_PROTOCOL');
+        const MONGO_APP_NAME = configService.get<string>('MONGO_APP_NAME');
 
         if (
           !MONGO_USERNAME ||
           !MONGO_PASSWORD ||
           !MONGO_INITDB_DATABASE ||
-          !MONGO_HOST ||
-          !MONGO_PORT
+          !MONGO_HOST
         ) {
           logger.error(
             'Missing MongoDB connection environment variables! Please check your .env file.',
@@ -39,7 +40,19 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
           throw new Error('MongoDB connection configuration missing.');
         }
 
-        const dbConnectionURL = `mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_INITDB_DATABASE}?authSource=admin`;
+        let extraArgs = '';
+        if (MONGO_PROTOCOL === 'mongodb+srv') {
+          extraArgs = `?retryWrites=true&w=majority&appName=${MONGO_APP_NAME}`;
+        } else if (MONGO_PROTOCOL === 'mongodb') {
+          if (MONGO_PORT === '') {
+            logger.error(
+              'Missing MongoDB port environment variable! Please check your .env file.',
+            );
+            throw new Error('MongoDB port configuration missing.');
+          }
+          extraArgs = '?authSource=admin';
+        }
+        const dbConnectionURL = `${MONGO_PROTOCOL}://${MONGO_USERNAME}:${MONGO_PASSWORD}@${MONGO_HOST}:${MONGO_PORT}/${MONGO_INITDB_DATABASE}?${extraArgs}`;
         logger.log(`Attempting to connect to MongoDB: ${dbConnectionURL}`);
 
         return {

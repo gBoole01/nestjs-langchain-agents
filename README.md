@@ -40,6 +40,10 @@ npm run start:dev
 - [x] Add agent debug service
 - [x] Add enhanced memory
 - [x] Add archivist agent to stock analysis
+- [ ] Self-Correction with LLM Tools
+- [ ] Add planner agent to stock analysis
+- [ ] Expand data sources
+- [ ] Place orders on simulated trading platform
 
 ## Goal Project Structure
 

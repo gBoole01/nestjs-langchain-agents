@@ -1,27 +1,43 @@
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { MessagesAnnotation, StateGraph } from '@langchain/langgraph';
-import { ToolNode } from '@langchain/langgraph/prebuilt';
-import { TavilySearch } from '@langchain/tavily';
+import { BaseMessage } from '@langchain/core/messages';
+import { Annotation, StateGraph } from '@langchain/langgraph';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { DiscordService } from 'src/integrations/discord/discord.service';
+import { ArchivistAgentService } from './crew/archivist-agent.service';
+import { CriticAgentService } from './crew/critic-agent.service';
 import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
-import { DataAnalystTool } from './tools/data-analyst.tool';
+import { JournalistAgentService } from './crew/journalist-agent.service';
+import { WriterAgentService } from './crew/writer-agent.service';
+
+const AgentState = Annotation.Root({
+  // The 'messages' channel is for managing conversation history
+  messages: Annotation<BaseMessage[]>({
+    reducer: (x, y) => x.concat(y),
+    default: () => [],
+  }),
+  // Custom channels for our workflow
+  ticker: Annotation<string>(),
+  date: Annotation<string>(),
+  archivist_report: Annotation<string>(),
+  data_report: Annotation<string>(),
+  news_report: Annotation<string>(),
+  writer_draft: Annotation<string>(),
+  critic_verdict: Annotation<'PASS' | 'FAIL'>(),
+  critic_feedback: Annotation<string>(),
+});
 
 @Injectable()
 export class StockAnalysisAgentGraphService implements OnModuleInit {
-  private googleApiKey: string;
-  private geminiModel: string;
   private readonly logger = new Logger(StockAnalysisAgentGraphService.name);
   private agent: any | null = null;
 
   constructor(
-    private readonly configService: ConfigService,
+    private readonly discordService: DiscordService,
     private readonly dataAnalystAgent: DataAnalystAgentService,
-  ) {
-    this.googleApiKey = this.configService.get<string>('GEMINI_API_KEY');
-    this.geminiModel = this.configService.get<string>('GEMINI_MODEL');
-  }
+    private readonly journalistAgent: JournalistAgentService,
+    private readonly writerAgent: WriterAgentService,
+    private readonly criticAgent: CriticAgentService,
+    private readonly archivistAgent: ArchivistAgentService,
+  ) {}
 
   async onModuleInit() {
     await this.initializeAgent();
@@ -30,19 +46,25 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
 
   private async initializeAgent() {
     try {
-      const agentTools = [
-        new TavilySearch({ maxResults: 3 }),
-        new DataAnalystTool(this.dataAnalystAgent),
-      ];
-      const toolNode = new ToolNode(agentTools);
-      const workflow = new StateGraph(MessagesAnnotation)
-        .addNode('orchestrator', (state) => this.callOrchestrator(state))
-        .addEdge('__start__', 'orchestrator')
-        .addNode('tools', toolNode)
-        .addEdge('tools', 'orchestrator')
-        .addConditionalEdges('orchestrator', (state) =>
-          this.shouldContinue(state),
-        );
+      const workflow = new StateGraph(AgentState)
+        .addNode('archivist', (state) => this.fetchArchivistReport(state))
+        .addNode('parallel_analysis', (state) =>
+          this.runParallelAnalysis(state),
+        )
+        .addNode('writer', (state) => this.writeReport(state))
+        .addNode('critic', (state) => this.critiqueReport(state))
+        .addNode('save_report', (state) => {
+          this.archivistAgent.saveReport(state.ticker, state.writer_draft);
+          return {};
+        })
+        .addEdge('__start__', 'archivist')
+        .addEdge('archivist', 'parallel_analysis')
+        .addEdge('parallel_analysis', 'writer')
+        .addEdge('writer', 'critic')
+        .addConditionalEdges('critic', (state) =>
+          state.critic_verdict === 'PASS' ? 'save_report' : 'writer',
+        )
+        .addEdge('save_report', '__end__');
       this.agent = workflow.compile();
       this.logger.log('Stock Analysis Agent initialized successfully');
     } catch (error) {
@@ -50,6 +72,12 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
         'Failed to initialize Stock Analysis agent:',
         error.message,
       );
+    }
+  }
+
+  async runAnalysisForTickers(tickers: string[]) {
+    for (const ticker of tickers) {
+      await this.runAgent(ticker);
     }
   }
 
@@ -62,45 +90,64 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
     try {
       this.logger.log('Testing agent with sample query...');
       const result = await this.agent.invoke({
-        messages: [new HumanMessage(`What's the latest price for ${ticker}?`)],
+        ticker,
+        date: new Date().toISOString().split('T')[0],
       });
-      console.log(result);
+      this.discordService.sendToDiscord(result.writer_draft);
     } catch (error) {
       this.logger.error('Agent test failed:', error.message);
     }
   }
 
-  shouldContinue({ messages }: typeof MessagesAnnotation.State) {
-    console.log('shouldContinue');
-    console.log(messages);
-    const lastMessage = messages[messages.length - 1] as AIMessage;
-    if (lastMessage.tool_calls?.length) {
-      return 'tools';
-    }
-    return '__end__';
-  }
+  // Node to get the archivist's report
+  fetchArchivistReport = async (state) => {
+    const report = await this.archivistAgent.getInformedOpinion(state.ticker);
+    return { archivist_report: report };
+  };
 
-  async callOrchestrator(state: typeof MessagesAnnotation.State) {
-    const model = new ChatGoogleGenerativeAI({
-      apiKey: this.googleApiKey,
-      model: this.geminiModel,
-      temperature: 0.1,
-      maxOutputTokens: 8192,
-    });
-    const modelWithTools = model.bindTools([
-      new DataAnalystTool(this.dataAnalystAgent),
+  // Node to run data and news analysis in parallel
+  // This would internally handle Promise.all()
+  runParallelAnalysis = async (state) => {
+    const [dataResult, newsResult] = await Promise.all([
+      this.dataAnalystAgent.analyzeData({
+        ticker: state.ticker,
+        date: state.date,
+      }),
+      this.journalistAgent.analyzeNews({
+        ticker: state.ticker,
+        date: state.date,
+      }),
     ]);
+    // Handle success/failure as you did in your code
+    return { data_report: dataResult.data, news_report: newsResult.data };
+  };
 
-    const systemPrompt = `You are a financial orchestrator agent. Your primary goal is to answer questions about stock performance by leveraging specialized tools.
-  
-  **Instructions:**
-  - When asked about specific stock data, like performance or price trends, always prioritize using the \`data_analyst\` tool.
-  - For general knowledge questions or information not related to stock analysis, you can answer directly.
-  - If a user asks for general market information or news, use the \`tavily_search_results_json\` tool to find relevant information.`;
+  // Node for the Writer Agent
+  writeReport = async (state) => {
+    // Use state.data_report, state.news_report, etc.
+    const draft = await this.writerAgent.writeReport(
+      state.ticker,
+      state.date,
+      state.data_report,
+      state.news_report,
+      state.archivist_report,
+      state.critic_feedback,
+    );
+    return { writer_draft: draft.data };
+  };
 
-    const updatedMessages = [new HumanMessage(systemPrompt), ...state.messages];
-
-    const response = await modelWithTools.invoke(updatedMessages);
-    return { messages: [response] };
-  }
+  // Node for the Critic Agent
+  critiqueReport = async (state) => {
+    const verdict = await this.criticAgent.critiqueReport(
+      state.writer_draft,
+      state.data_report,
+      state.news_report,
+      state.archivist_report,
+    );
+    // Return the verdict and feedback for the next step
+    return {
+      critic_verdict: verdict.verdict,
+      critic_feedback: verdict.feedback,
+    };
+  };
 }

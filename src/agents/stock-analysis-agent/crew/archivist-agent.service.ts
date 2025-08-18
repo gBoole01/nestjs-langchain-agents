@@ -1,14 +1,20 @@
-// archivist-agent.service.ts
+import { Document } from '@langchain/core/documents';
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from '@langchain/core/prompts';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { StructuredToolInterface } from '@langchain/core/tools';
+import {
+  ChatGoogleGenerativeAI,
+  GoogleGenerativeAIEmbeddings,
+} from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
+import { ChromaClient, EmbeddingFunction } from 'chromadb';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 import { Model } from 'mongoose';
+import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { Report, ReportDocument } from '../models/reports.model';
 import { AgentResult } from '../stock-analysis-agent.types';
 
@@ -17,14 +23,31 @@ export class ArchivistAgentService implements OnModuleInit {
   private readonly logger = new Logger(ArchivistAgentService.name);
   private agentExecutor: AgentExecutor | null = null;
   private isInitialized = false;
+  private chromaClient: ChromaClient | null = null;
+  private embeddings: GoogleGenerativeAIEmbeddings | null = null;
+  private chromaCollection: any;
 
   constructor(
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
+    private readonly reportRetrievalTool: ReportRetrievalTool,
     private readonly configService: ConfigService,
   ) {}
 
   async onModuleInit() {
     try {
+      this.chromaClient = new ChromaClient({ path: 'http://localhost:8000' });
+      const embeddingFunction: EmbeddingFunction = {
+        generate: async (texts: string[]) => {
+          const embeddings = await this.embeddings.embedDocuments(texts);
+          return embeddings as number[][];
+        },
+      };
+
+      this.chromaCollection = await this.chromaClient.getOrCreateCollection({
+        name: 'stock_reports',
+        embeddingFunction: embeddingFunction,
+      });
+
       // Initialize the Mongoose connection check
       await this.reportModel.countDocuments().exec();
 
@@ -55,17 +78,25 @@ export class ArchivistAgentService implements OnModuleInit {
         maxOutputTokens: 8192,
       });
 
+      const tools: StructuredToolInterface[] = [
+        this.reportRetrievalTool.getTool(),
+      ];
+
       const prompt = ChatPromptTemplate.fromMessages([
         [
           'system',
-          `You are the Archivist Agent, a wise and insightful historian of financial reports. Your role is to read a series of past reports for a specific stock and synthesize them into a concise, informed opinion.
+          `You are the Archivist Agent, a wise and insightful historian of financial reports.
+          Your primary tool for research is "retrieve_reports," which allows you to search
+          the historical database for relevant past analysis.
 
           Your task is:
-          1.  Read through the provided historical reports, which are already structured as a JSON array.
-          2.  Identify key trends, shifts in market sentiment, and any recurring themes over time.
-          3.  Generate a short, high-level summary that serves as a "memory" for the writer. This summary should not just be a concatenation of the reports but a true synthesis.
-          4.  The final output must be a single paragraph, providing a clear and "informed opinion" on the stock's recent trajectory.
-          `,
+          1.  Receive a query from the user about a stock's past performance.
+          2.  **Use the "retrieve_reports" tool to find the most relevant reports.**
+          3.  Carefully read and synthesize the retrieved reports.
+          4.  Identify key trends, shifts in market sentiment, and recurring themes over time from the results.
+          5.  Generate a short, high-level summary that serves as a "memory" for the writer. This summary must be a true synthesis, not just a concatenation.
+          6.  The final output must be a single paragraph, providing a clear and "informed opinion" on the stock's recent trajectory.
+          `.trim(),
         ],
         new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
@@ -73,7 +104,7 @@ export class ArchivistAgentService implements OnModuleInit {
 
       const agent = createToolCallingAgent({
         llm: model,
-        tools: [],
+        tools,
         prompt,
       });
       this.agentExecutor = new AgentExecutor({
@@ -93,11 +124,11 @@ export class ArchivistAgentService implements OnModuleInit {
   }
 
   /**
-   * Retrieves a series of historical reports for a given ticker and synthesizes an informed opinion.
-   * @param ticker The stock ticker symbol.
-   * @returns A synthesized string of past analysis or null if no reports are found.
+   * Retrieves a series of historical reports for a given query and synthesizes an informed opinion.
+   * @param query The user's query, e.g., "synthesize an opinion on MSFT".
+   * @returns A synthesized string of past analysis or null if the agent fails.
    */
-  async getInformedOpinion(ticker: string): Promise<string | null> {
+  async getInformedOpinion(query: string): Promise<string | null> {
     if (!this.isInitialized || !this.agentExecutor) {
       this.logger.warn(
         'Archivist Agent is not initialized. Cannot provide an informed opinion.',
@@ -106,28 +137,13 @@ export class ArchivistAgentService implements OnModuleInit {
     }
 
     try {
-      // Find the last 5 reports for the ticker, sorted by date.
-      const historicalReports = await this.reportModel
-        .find({ ticker })
-        .sort({ date: -1 })
-        .limit(5)
-        .exec();
-
-      if (historicalReports.length === 0) {
-        this.logger.log(`No historical reports found for ticker: ${ticker}.`);
-        return null;
-      }
-
-      // Format the reports into a JSON string for the LLM
-      const input = `
-        Please provide an informed opinion on the past performance of ticker ${ticker} based on these historical reports:
-        ${JSON.stringify(historicalReports, null, 2)}
-      `;
-
-      const result = await this.agentExecutor.invoke({ input });
+      // The agent executor will now decide how to handle the query,
+      // including whether to use the retrieve_reports tool.
+      const result = await this.agentExecutor.invoke({ input: query });
       const opinion = result.output as string;
 
-      this.logger.log(`Informed opinion for ticker ${ticker} generated.`);
+      this.logger.log(`Informed opinion for query "${query}" generated.`);
+      this.logger.log(`Agent output: ${opinion}`);
       return opinion;
     } catch (error) {
       this.logger.error('Failed to generate informed opinion:', error.message);
@@ -136,7 +152,7 @@ export class ArchivistAgentService implements OnModuleInit {
   }
 
   /**
-   * Saves a new report to the database.
+   * Saves a new report to both MongoDB (for full content) and ChromaDB (for embeddings).
    * @param ticker The stock ticker symbol.
    * @param reportContent The full content of the generated report.
    * @returns An AgentResult indicating success or failure.
@@ -150,16 +166,38 @@ export class ArchivistAgentService implements OnModuleInit {
     }
 
     try {
+      // 1. Save the raw report to MongoDB
       const newReport = new this.reportModel({
         ticker,
         reportContent,
         date: new Date(),
       });
-      await newReport.save();
-      this.logger.log(`Report for ticker ${ticker} saved to database.`);
+      const savedReport = await newReport.save();
+
+      // 2. Prepare the document for ChromaDB
+      const document: Document = {
+        pageContent: reportContent,
+        metadata: {
+          ticker: ticker,
+          date: savedReport.date.toISOString(),
+          source: 'generated-report',
+        },
+      };
+
+      // 3. Add the document to ChromaDB
+      // ChromaDB's `add` method can handle the embedding for us.
+      // We pass the raw document and metadata, and ChromaDB takes care of the rest.
+      await this.chromaCollection.add({
+        ids: [savedReport._id.toString()],
+        documents: [document.pageContent],
+        metadatas: [document.metadata],
+      });
+
+      this.logger.log(`Report for ticker ${ticker} saved to both databases.`);
       return { success: true, data: 'Report saved successfully.' };
     } catch (error) {
       this.logger.error('Failed to save report:', error.message);
+      // Optional: Add a rollback mechanism here if you need to delete the Mongo record on failure
       return { success: false, error: error.message };
     }
   }

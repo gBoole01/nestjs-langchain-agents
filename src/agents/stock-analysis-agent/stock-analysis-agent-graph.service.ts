@@ -8,23 +8,6 @@ import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
 import { WriterAgentService } from './crew/writer-agent.service';
 
-const AgentState = Annotation.Root({
-  // The 'messages' channel is for managing conversation history
-  messages: Annotation<BaseMessage[]>({
-    reducer: (x, y) => x.concat(y),
-    default: () => [],
-  }),
-  // Custom channels for our workflow
-  ticker: Annotation<string>(),
-  date: Annotation<string>(),
-  archivist_report: Annotation<string>(),
-  data_report: Annotation<string>(),
-  news_report: Annotation<string>(),
-  writer_draft: Annotation<string>(),
-  critic_verdict: Annotation<'PASS' | 'FAIL'>(),
-  critic_feedback: Annotation<string>(),
-});
-
 @Injectable()
 export class StockAnalysisAgentGraphService implements OnModuleInit {
   private readonly logger = new Logger(StockAnalysisAgentGraphService.name);
@@ -45,6 +28,23 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
   }
 
   private async initializeAgent() {
+    const AgentState = Annotation.Root({
+      // The 'messages' channel is for managing conversation history
+      messages: Annotation<BaseMessage[]>({
+        reducer: (x, y) => x.concat(y),
+        default: () => [],
+      }),
+      // Custom channels for our workflow
+      ticker: Annotation<string>(),
+      date: Annotation<string>(),
+      archivist_report: Annotation<string>(),
+      data_report: Annotation<string>(),
+      news_report: Annotation<string>(),
+      writer_draft: Annotation<string>(),
+      critic_verdict: Annotation<'PASS' | 'FAIL'>(),
+      critic_feedback: Annotation<string>(),
+    });
+
     try {
       const workflow = new StateGraph(AgentState)
         .addNode('archivist', (state) => this.fetchArchivistReport(state))
@@ -101,7 +101,8 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
 
   // Node to get the archivist's report
   fetchArchivistReport = async (state) => {
-    const report = await this.archivistAgent.getInformedOpinion(state.ticker);
+    const query = `Provide a synthesized opinion on the past performance of ticker ${state.ticker} based on historical reports.`;
+    const report = await this.archivistAgent.getInformedOpinion(query);
     return { archivist_report: report };
   };
 

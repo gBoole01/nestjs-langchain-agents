@@ -33,6 +33,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^6.0.0",
     "cheerio": "^1.1.0",
+    "chromadb": "^3.0.14",
     "langchain": "^0.3.30",
     "mongoose": "^8.17.1",
     "puppeteer": "^24.16.0",

@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ReportRetrievalModule } from 'src/tools/rag/report-retrieval.module';
 import { SerperModule } from 'src/tools/serper/serper.module';
 import { WebScrapingModule } from 'src/tools/web-scraping/web-scraping.module';
 import { TiingoModule } from '../../tools/tiingo/tiingo.module';
@@ -22,6 +23,7 @@ import { StockAnalysisAgentService } from './stock-analysis-agent.service';
     ConfigModule,
     SerperModule,
     WebScrapingModule,
+    ReportRetrievalModule,
     MongooseModule.forFeature([{ name: Report.name, schema: ReportSchema }]),
   ],
   providers: [

@@ -16,8 +16,20 @@ services:
     networks:
       - stock-analysis-network
 
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: stock-analysis-chromadb
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    volumes:
+      - chromadb_data:/data/chroma
+    networks:
+      - stock-analysis-network
+
 volumes:
   mongodb_data:
+  chromadb_data:
 
 networks:
   stock-analysis-network:

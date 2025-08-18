@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { DiscordService } from 'src/integrations/discord/discord.service';
-import { ArchivistAgentService } from './crew/archivist-agent.service'; // Import the new Archivist Agent
+import { ArchivistAgentService } from './crew/archivist-agent.service';
 import { CriticAgentService } from './crew/critic-agent.service';
 import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
@@ -16,7 +16,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
     private readonly journalistAgent: JournalistAgentService,
     private readonly writerAgent: WriterAgentService,
     private readonly criticAgent: CriticAgentService,
-    private readonly archivistAgent: ArchivistAgentService, // Inject the new Archivist Agent
+    private readonly archivistAgent: ArchivistAgentService,
     private readonly discordService: DiscordService,
   ) {}
 

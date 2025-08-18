@@ -145,7 +145,6 @@ export class ArchivistAgentService implements OnModuleInit {
     ticker: string,
     reportContent: string,
   ): Promise<AgentResult> {
-    // ... (This method remains the same) ...
     if (!this.isInitialized) {
       return { success: false, error: 'Archivist Agent is not initialized.' };
     }

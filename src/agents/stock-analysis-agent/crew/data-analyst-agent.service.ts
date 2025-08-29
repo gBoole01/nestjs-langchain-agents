@@ -8,7 +8,6 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
-import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
 import {
   AgentResult,
   AnalysisRequest,
@@ -24,7 +23,6 @@ export class DataAnalystAgentService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly fetchStockDataTool: FetchStockDataTool,
-    private readonly webScrapingTool: WebScrapingTool,
   ) {}
 
   async onModuleInit() {

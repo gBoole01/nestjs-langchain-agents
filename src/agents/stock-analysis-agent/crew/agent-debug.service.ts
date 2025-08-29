@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
 import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
@@ -11,10 +12,12 @@ export class AgentDebugService implements OnModuleInit {
     private readonly fetchStockDataTool: FetchStockDataTool,
     private readonly serperNewsTool: SerperNewsTool,
     private readonly serperWebTool: SerperWebTool,
+    private readonly reportRetrievalTool: ReportRetrievalTool,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     this.logger.log('Agent Debug Service initialized');
+    // await this.testTools('PLTR');
   }
 
   /**
@@ -65,6 +68,19 @@ export class AgentDebugService implements OnModuleInit {
       );
     } catch (error) {
       this.logger.error(`Web search tool failed: ${error.message}`);
+    }
+
+    try {
+      this.logger.log('Testing ReportRetrievalTool...');
+      const reportTool = this.reportRetrievalTool.getTool();
+      const reportResult = await reportTool.invoke({
+        query: `${ticker}`,
+      });
+      this.logger.log(
+        `Report retrieval result: ${JSON.stringify(reportResult, null, 2)}`,
+      );
+    } catch (error) {
+      this.logger.error(`Report retrieval tool failed: ${error.message}`);
     }
   }
 }

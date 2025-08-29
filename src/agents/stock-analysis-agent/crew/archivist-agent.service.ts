@@ -36,6 +36,12 @@ export class ArchivistAgentService implements OnModuleInit {
   async onModuleInit() {
     try {
       this.chromaClient = new ChromaClient({ path: 'http://localhost:8000' });
+
+      this.embeddings = new GoogleGenerativeAIEmbeddings({
+        apiKey: this.configService.get<string>('GEMINI_API_KEY'),
+        model: 'embedding-001',
+      });
+
       const embeddingFunction: EmbeddingFunction = {
         generate: async (texts: string[]) => {
           const embeddings = await this.embeddings.embedDocuments(texts);

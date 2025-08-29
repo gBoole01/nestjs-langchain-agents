@@ -23,41 +23,42 @@ export class ArchivistAgentService implements OnModuleInit {
   private readonly logger = new Logger(ArchivistAgentService.name);
   private agentExecutor: AgentExecutor | null = null;
   private isInitialized = false;
-  private chromaClient: ChromaClient | null = null;
-  private embeddings: GoogleGenerativeAIEmbeddings | null = null;
+  private embeddings: GoogleGenerativeAIEmbeddings; // Remove 'null'
   private chromaCollection: any;
+  private isProduction = false;
 
   constructor(
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     private readonly reportRetrievalTool: ReportRetrievalTool,
     private readonly configService: ConfigService,
-  ) {}
+  ) {
+    this.isProduction = this.configService.get('NODE_ENV') === 'production';
+    // Initialize embeddings here to ensure it's always set
+    this.embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: this.configService.get<string>('GEMINI_API_KEY'),
+      model: 'embedding-001',
+    });
+  }
 
   async onModuleInit() {
     try {
-      this.chromaClient = new ChromaClient({ path: 'http://localhost:8000' });
+      if (!this.isProduction) {
+        const chromaClient = new ChromaClient({
+          path: 'http://localhost:8000',
+        });
+        const embeddingFunction: EmbeddingFunction = {
+          generate: async (texts: string[]) => {
+            const embeddings = await this.embeddings.embedDocuments(texts);
+            return embeddings as number[][];
+          },
+        };
+        this.chromaCollection = await chromaClient.getOrCreateCollection({
+          name: 'stock_reports',
+          embeddingFunction: embeddingFunction,
+        });
+      }
 
-      this.embeddings = new GoogleGenerativeAIEmbeddings({
-        apiKey: this.configService.get<string>('GEMINI_API_KEY'),
-        model: 'embedding-001',
-      });
-
-      const embeddingFunction: EmbeddingFunction = {
-        generate: async (texts: string[]) => {
-          const embeddings = await this.embeddings.embedDocuments(texts);
-          return embeddings as number[][];
-        },
-      };
-
-      this.chromaCollection = await this.chromaClient.getOrCreateCollection({
-        name: 'stock_reports',
-        embeddingFunction: embeddingFunction,
-      });
-
-      // Initialize the Mongoose connection check
       await this.reportModel.countDocuments().exec();
-
-      // Initialize the LLM agent for analysis
       await this.initializeAgent();
 
       this.isInitialized = true;
@@ -111,6 +112,7 @@ export class ArchivistAgentService implements OnModuleInit {
         tools,
         prompt,
       });
+
       this.agentExecutor = new AgentExecutor({
         agent,
         tools: [this.reportRetrievalTool.getTool()],
@@ -120,9 +122,9 @@ export class ArchivistAgentService implements OnModuleInit {
       });
 
       this.isInitialized = true;
-      this.logger.log('Critic Agent initialized successfully');
+      this.logger.log('Archivist Agent initialized successfully');
     } catch (error) {
-      this.logger.error('Failed to initialize Critic agent:', error.message);
+      this.logger.error('Failed to initialize Archivist agent:', error.message);
       this.isInitialized = false;
     }
   }
@@ -142,8 +144,6 @@ export class ArchivistAgentService implements OnModuleInit {
 
     try {
       this.logger.log(`Generating informed opinion for query "${query}"...`);
-      // The agent executor will now decide how to handle the query,
-      // including whether to use the retrieve_reports tool.
       const result = await this.agentExecutor.invoke({ input: query });
       const opinion = result.output as string;
 
@@ -157,7 +157,7 @@ export class ArchivistAgentService implements OnModuleInit {
   }
 
   /**
-   * Saves a new report to both MongoDB (for full content) and ChromaDB (for embeddings).
+   * Saves a new report to the appropriate database based on the environment.
    * @param ticker The stock ticker symbol.
    * @param reportContent The full content of the generated report.
    * @returns An AgentResult indicating success or failure.
@@ -166,44 +166,94 @@ export class ArchivistAgentService implements OnModuleInit {
     ticker: string,
     reportContent: string,
   ): Promise<AgentResult> {
-    if (!this.isInitialized) {
+    if (!this.isInitialized || !this.embeddings) {
       return { success: false, error: 'Archivist Agent is not initialized.' };
     }
 
     try {
-      // 1. Save the raw report to MongoDB
       const newReport = new this.reportModel({
         ticker,
         reportContent,
         date: new Date(),
       });
       const savedReport = await newReport.save();
+      const [vector] = await this.embeddings.embedDocuments([reportContent]);
 
-      // 2. Prepare the document for ChromaDB
-      const document: Document = {
-        pageContent: reportContent,
-        metadata: {
-          ticker: ticker,
-          date: savedReport.date.toISOString(),
-          source: 'generated-report',
-        },
-      };
+      if (this.isProduction) {
+        await this.reportModel.findByIdAndUpdate(savedReport._id, {
+          vector: vector as number[],
+        });
+      } else {
+        const document: Document = {
+          pageContent: reportContent,
+          metadata: {
+            ticker: ticker,
+            date: savedReport.date.toISOString(),
+            source: 'generated-report',
+          },
+        };
+        await this.chromaCollection.add({
+          ids: [savedReport._id.toString()],
+          documents: [document.pageContent],
+          metadatas: [document.metadata],
+        });
+      }
 
-      // 3. Add the document to ChromaDB
-      // ChromaDB's `add` method can handle the embedding for us.
-      // We pass the raw document and metadata, and ChromaDB takes care of the rest.
-      await this.chromaCollection.add({
-        ids: [savedReport._id.toString()],
-        documents: [document.pageContent],
-        metadatas: [document.metadata],
-      });
-
-      this.logger.log(`Report for ticker ${ticker} saved to both databases.`);
+      this.logger.log(`Report for ticker ${ticker} saved to database.`);
       return { success: true, data: 'Report saved successfully.' };
     } catch (error) {
       this.logger.error('Failed to save report:', error.message);
-      // Optional: Add a rollback mechanism here if you need to delete the Mongo record on failure
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Retrieves relevant reports using the appropriate database for the environment.
+   * @param query The user's search query.
+   * @returns A JSON string of the most relevant reports.
+   */
+  async retrieveReports(query: string): Promise<string> {
+    if (!this.isInitialized || !this.embeddings) {
+      throw new Error('Archivist Agent is not initialized.');
+    }
+
+    try {
+      const [queryVector] = await this.embeddings.embedDocuments([query]);
+
+      if (this.isProduction) {
+        const results = await this.reportModel
+          .aggregate([
+            {
+              $vectorSearch: {
+                index: 'vector_index',
+                path: 'vector',
+                queryVector: queryVector,
+                numCandidates: 100,
+                limit: 5,
+              },
+            },
+            { $project: { reportContent: 1, _id: 0 } },
+          ])
+          .exec();
+
+        if (!results || results.length === 0) {
+          return 'No relevant reports found in the archive.';
+        }
+        return JSON.stringify(results.map((doc) => doc.reportContent));
+      } else {
+        const results = await this.chromaCollection.query({
+          queryTexts: [query],
+          nResults: 5,
+        });
+
+        if (!results.documents || results.documents[0].length === 0) {
+          return 'No relevant reports found in the archive.';
+        }
+        return results.documents[0].join('\n\n---\n\n');
+      }
+    } catch (error) {
+      this.logger.error('Failed to retrieve reports:', error.message);
+      throw new Error('An error occurred while retrieving historical reports.');
     }
   }
 }

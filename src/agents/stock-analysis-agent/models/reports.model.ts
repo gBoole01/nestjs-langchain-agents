@@ -13,6 +13,9 @@ export class Report {
 
   @Prop({ required: true })
   date: Date;
+
+  @Prop({ type: [Number], required: true })
+  vector: number[];
 }
 
 export const ReportSchema = SchemaFactory.createForClass(Report);

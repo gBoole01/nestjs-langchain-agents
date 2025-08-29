@@ -1,35 +1,63 @@
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChromaClient } from 'chromadb';
+import { ChromaClient, EmbeddingFunction } from 'chromadb';
 
 @Injectable()
 export class ReportRetrievalService {
   private chromaClient: ChromaClient;
   private embeddings: GoogleGenerativeAIEmbeddings;
+  private chromaCollection: any;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private logger: Logger,
+  ) {
     this.chromaClient = new ChromaClient({ path: 'http://localhost:8000' });
+
     this.embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: this.configService.get<string>('GEMINI_API_KEY'),
       model: 'embedding-001',
     });
   }
 
-  async retrieveReports(query: string) {
-    // 1. Generate an embedding for the query
-    const queryEmbedding = await this.embeddings.embedQuery(query);
+  async onModuleInit() {
+    const embeddingFunction: EmbeddingFunction = {
+      generate: async (texts: string[]) => {
+        const embeddings = await this.embeddings.embedDocuments(texts);
+        return embeddings as number[][];
+      },
+    };
 
-    // 2. Perform a similarity search in ChromaDB
-    const collection = await this.chromaClient.getCollection({
+    this.chromaCollection = await this.chromaClient.getOrCreateCollection({
       name: 'stock_reports',
+      embeddingFunction: embeddingFunction,
     });
-    const results = await collection.query({
-      queryEmbeddings: [queryEmbedding],
-      nResults: 5,
-    });
+  }
 
-    // 3. Extract the relevant documents and return them
-    return results.documents;
+  async retrieveReports(query: string): Promise<string> {
+    try {
+      // The query function will use the pre-configured embedding function
+      const results = await this.chromaCollection.query({
+        queryTexts: [query],
+        nResults: 5, // Retrieve the top 5 most relevant documents
+      });
+
+      // If no documents are returned, handle gracefully
+      if (!results.documents || results.documents[0].length === 0) {
+        return 'No relevant reports found in the archive.';
+      }
+
+      // Extract and combine the page content from the query result
+      const relevantReports = results.documents[0].join('\n\n---\n\n');
+
+      return relevantReports;
+    } catch (error) {
+      this.logger.error(
+        'Failed to retrieve reports from ChromaDB:',
+        error.message,
+      );
+      throw new Error('An error occurred while retrieving historical reports.');
+    }
   }
 }

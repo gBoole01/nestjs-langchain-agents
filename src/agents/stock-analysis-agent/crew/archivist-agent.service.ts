@@ -91,18 +91,16 @@ export class ArchivistAgentService implements OnModuleInit {
       const prompt = ChatPromptTemplate.fromMessages([
         [
           'system',
-          `You are the Archivist Agent, a wise and insightful historian of financial reports.
-          Your primary tool for research is "retrieve_reports," which allows you to search
-          the historical database for relevant past analysis.
+          `You are the Archivist Agent, a highly specialized financial researcher. Your sole purpose is to retrieve, synthesize, and provide context from historical financial reports.
 
-          Your task is:
-          1.  Receive a query from the user about a stock's past performance.
-          2.  **Use the "retrieve_reports" tool to find the most relevant reports.**
-          3.  Carefully read and synthesize the retrieved reports.
-          4.  Identify key trends, shifts in market sentiment, and recurring themes over time from the results.
-          5.  Generate a short, high-level summary that serves as a "memory" for the writer. This summary must be a true synthesis, not just a concatenation.
-          6.  The final output must be a single paragraph, providing a clear and "informed opinion" on the stock's recent trajectory.
-          `.trim(),
+          You are equipped with a single, powerful tool: "retrieve_reports." This is the only way you can access historical data.
+
+          Your workflow is as follows:
+          1. Upon receiving a query, you MUST first use the "retrieve_reports" tool to find all relevant historical reports.
+          2. You will then use the information returned from the tool to synthesize a concise, high-level summary.
+          3. The final output must be a single paragraph that provides a clear and "informed opinion" based solely on the retrieved historical data.
+
+          Never attempt to answer a query without first using your tool. Your entire existence is to use this tool to provide information.`.trim(),
         ],
         new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
@@ -115,7 +113,7 @@ export class ArchivistAgentService implements OnModuleInit {
       });
       this.agentExecutor = new AgentExecutor({
         agent,
-        tools: [],
+        tools: [this.reportRetrievalTool.getTool()],
         verbose: this.configService.get('NODE_ENV') === 'development',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
@@ -143,6 +141,7 @@ export class ArchivistAgentService implements OnModuleInit {
     }
 
     try {
+      this.logger.log(`Generating informed opinion for query "${query}"...`);
       // The agent executor will now decide how to handle the query,
       // including whether to use the retrieve_reports tool.
       const result = await this.agentExecutor.invoke({ input: query });

@@ -1,0 +1,47 @@
+[
+    {
+        "symbol": "ISHS VII",
+        "name": "iShs VII-Core S&P 500 U.ETF",
+        "shares": 0.674926,
+        "currentPrice": 589.46,
+        "valueInEUR": 397.84,
+        "isin": "IEO0B5BMR087",
+        "countryOfRegistration": "Irlande"
+    },
+    {
+        "symbol": "ISHS III",
+        "name": "IShsill-C.MSCI Eu.U.E.EUR ACC",
+        "shares": 2.959981,
+        "currentPrice": 87.00,
+        "valueInEUR": 257.52,
+        "isin": "IEO0B4K48X80",
+        "countryOfRegistration": "Allemagne"
+    },
+    {
+        "symbol": "WTMSL",
+        "name": "WisdomTree Metal Securiti.Ltd.",
+        "shares": 1.423183,
+        "currentPrice": 282.06,
+        "valueInEUR": 401.42,
+        "isin": "JEO0B588CD74",
+        "countryOfRegistration": "Royaume-Uni"
+    },
+    {
+        "symbol": "MUL",
+        "name": "MUL Amundi DAX III",
+        "shares": 1.849842,
+        "currentPrice": 218.65,
+        "valueInEUR": 404.47,
+        "isin": "LUO25263375",
+        "countryOfRegistration": "France"
+    },
+    {
+        "symbol": "NVDA",
+        "name": "NVIDIA Corp.",
+        "shares": 1.283524,
+        "currentPrice": 148.74,
+        "valueInEUR": 190.91,
+        "isin": "US67066G1040",
+        "countryOfRegistration": "États-Unis"
+    }
+]

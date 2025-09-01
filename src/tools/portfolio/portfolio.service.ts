@@ -7,7 +7,14 @@ export class PortfolioService {
   private portfolio: any[] = [];
 
   constructor() {
-    const filePath = join(__dirname, '..', 'data', 'portfolio.json');
+    const filePath = join(
+      __dirname,
+      '..',
+      '..',
+      '..',
+      'data',
+      'portfolio.json',
+    );
     const fileData = readFileSync(filePath, 'utf-8');
     this.portfolio = JSON.parse(fileData);
   }

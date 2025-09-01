@@ -116,7 +116,7 @@ export class ArchivistAgentService implements OnModuleInit {
       this.agentExecutor = new AgentExecutor({
         agent,
         tools: [this.reportRetrievalTool.getTool()],
-        verbose: this.configService.get('NODE_ENV') === 'development',
+        verbose: this.configService.get('VERBOSE') === 'true',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
       });

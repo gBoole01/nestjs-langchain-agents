@@ -49,12 +49,13 @@ export class WriterAgentService implements OnModuleInit {
           -   Well-structured with clear headings.
           -   Easy to read for a non-expert audience.
           -   Insightful, explaining the "why" behind the market movements.
+          -   **Crucially, you must incorporate the user's personal portfolio data to provide actionable, tailored advice in the conclusion.**
 
           Report Structure:
           -   **Executive Summary:** A brief, punchy summary of the stock's recent performance.
           -   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
           -   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
-          -   **Conclusion:** Provide a final, balanced assessment.
+          -   **Conclusion & Portfolio Action:** Provide a final, balanced assessment and, based on the user's portfolio, offer a concrete, actionable recommendation.
 
           You will be provided with technical data, news analysis, and a previous report for context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
           `,
@@ -71,7 +72,7 @@ export class WriterAgentService implements OnModuleInit {
       this.agentExecutor = new AgentExecutor({
         agent,
         tools: [],
-        verbose: this.configService.get('NODE_ENV') === 'development',
+        verbose: this.configService.get('VERBOSE') === 'true',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
       });
@@ -90,7 +91,8 @@ export class WriterAgentService implements OnModuleInit {
    * @param date The current date of the analysis.
    * @param dataAnalysis The technical data analysis result.
    * @param newsAnalysis The news and sentiment analysis result.
-   * @param memory The previous report memory for context.
+   * @param portfolioAnalysis The user's portfolio holdings.
+   * @param archivistReport The previous report memory for context.
    * @param feedback Optional feedback from a critic to revise the report.
    * @returns An AgentResult containing the generated report or an error.
    */
@@ -100,7 +102,8 @@ export class WriterAgentService implements OnModuleInit {
     dataAnalysis: DataAnalysisResult,
     newsAnalysis: NewsAnalysisResult,
     archivistReport: string,
-    feedback?: string,
+    feedback: string,
+    portfolioAnalysis: string,
   ): Promise<AgentResult> {
     try {
       if (!this.isInitialized || !this.agentExecutor) {
@@ -121,8 +124,11 @@ ${JSON.stringify(dataAnalysis, null, 2)}
 ### News and Sentiment Analysis:
 ${JSON.stringify(newsAnalysis, null, 2)}
 
-### Archivist Report :
+### Archivist Report:
 ${archivistReport}
+
+### User's Portfolio:
+${portfolioAnalysis}
 `;
 
       if (feedback) {

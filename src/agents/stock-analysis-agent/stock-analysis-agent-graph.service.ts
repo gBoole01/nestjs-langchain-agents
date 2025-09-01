@@ -6,6 +6,7 @@ import { ArchivistAgentService } from './crew/archivist-agent.service';
 import { CriticAgentService } from './crew/critic-agent.service';
 import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
+import { PortfolioAnalystAgentService } from './crew/portfolio-analyst.service';
 import { WriterAgentService } from './crew/writer-agent.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
     private readonly discordService: DiscordService,
     private readonly dataAnalystAgent: DataAnalystAgentService,
     private readonly journalistAgent: JournalistAgentService,
+    private readonly portfolioAnalystAgent: PortfolioAnalystAgentService,
     private readonly writerAgent: WriterAgentService,
     private readonly criticAgent: CriticAgentService,
     private readonly archivistAgent: ArchivistAgentService,
@@ -37,6 +39,7 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
       // Custom channels for our workflow
       ticker: Annotation<string>(),
       date: Annotation<string>(),
+      portfolio_analysis: Annotation<string>(),
       archivist_report: Annotation<string>(),
       data_report: Annotation<string>(),
       news_report: Annotation<string>(),
@@ -47,7 +50,6 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
 
     try {
       const workflow = new StateGraph(AgentState)
-        .addNode('archivist', (state) => this.fetchArchivistReport(state))
         .addNode('parallel_analysis', (state) =>
           this.runParallelAnalysis(state),
         )
@@ -57,8 +59,7 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
           this.archivistAgent.saveReport(state.ticker, state.writer_draft);
           return {};
         })
-        .addEdge('__start__', 'archivist')
-        .addEdge('archivist', 'parallel_analysis')
+        .addEdge('__start__', 'parallel_analysis')
         .addEdge('parallel_analysis', 'writer')
         .addEdge('writer', 'critic')
         .addConditionalEdges('critic', (state) =>
@@ -99,38 +100,35 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
     }
   }
 
-  // Node to get the archivist's report
-  fetchArchivistReport = async (state) => {
-    const query = `Provide a synthesized opinion on the past performance of ticker ${state.ticker} based on historical reports.`;
-    const report = await this.archivistAgent.getInformedOpinion(query);
-    return { archivist_report: report };
-  };
-
-  // Node to run data and news analysis in parallel
-  // This would internally handle Promise.all()
   runParallelAnalysis = async (state) => {
-    const [dataResult, newsResult] = await Promise.all([
-      this.dataAnalystAgent.analyzeData({
-        ticker: state.ticker,
-        date: state.date,
-      }),
-      this.journalistAgent.analyzeNews({
-        ticker: state.ticker,
-        date: state.date,
-      }),
-    ]);
-    // Handle success/failure as you did in your code
-    return { data_report: dataResult.data, news_report: newsResult.data };
+    const [dataResult, newsResult, portfolioAnalysis, archivist_report] =
+      await Promise.all([
+        this.dataAnalystAgent.analyzeData({
+          ticker: state.ticker,
+          date: state.date,
+        }),
+        this.journalistAgent.analyzeNews({
+          ticker: state.ticker,
+          date: state.date,
+        }),
+        this.portfolioAnalystAgent.analyzePortfolio(),
+        this.archivistAgent.getInformedOpinion(state.ticker),
+      ]);
+    return {
+      data_report: dataResult.data,
+      news_report: newsResult.data,
+      portfolio_analysis: portfolioAnalysis.data,
+      archivist_report: archivist_report,
+    };
   };
 
-  // Node for the Writer Agent
   writeReport = async (state) => {
-    // Use state.data_report, state.news_report, etc.
     const draft = await this.writerAgent.writeReport(
       state.ticker,
       state.date,
       state.data_report,
       state.news_report,
+      state.portfolio_analysis,
       state.archivist_report,
       state.critic_feedback,
     );

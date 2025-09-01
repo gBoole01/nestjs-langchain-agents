@@ -60,7 +60,7 @@ export class CriticAgentService implements OnModuleInit {
       this.agentExecutor = new AgentExecutor({
         agent,
         tools: [],
-        verbose: this.configService.get('NODE_ENV') === 'development',
+        verbose: this.configService.get('VERBOSE') === 'true',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
       });

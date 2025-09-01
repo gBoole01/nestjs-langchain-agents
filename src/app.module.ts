@@ -7,6 +7,7 @@ import { StockAnalysisAgentModule } from './agents/stock-analysis-agent/stock-an
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DiscordModule } from './integrations/discord/discord.module';
+import { PortfolioModule } from './tools/portfolio/portfolio.module';
 import { SerperModule } from './tools/serper/serper.module';
 import { TiingoModule } from './tools/tiingo/tiingo.module';
 import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
@@ -76,6 +77,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
     SerperModule,
     WebScrapingModule,
     TiingoModule,
+    PortfolioModule,
     StockAnalysisAgentModule,
   ],
   controllers: [AppController],

@@ -103,6 +103,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
           newsResult.data,
           archivistReport,
           critiqueVerdict.feedback,
+          '',
         );
 
         if (!writerResult.success) {

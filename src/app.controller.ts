@@ -10,8 +10,8 @@ export class AppController {
 
   @Get()
   async runAnalysis(): Promise<void> {
-    // const tickers = ['PLTR']; // Consume less API calls in development
-    const tickers = ['PLTR', 'NVDA', 'TSLA'];
+    const tickers = ['NVDA']; // Consume less API calls in development
+    // const tickers = ['PLTR', 'NVDA', 'TSLA'];
     // This is the procedural way to run the analysis
     // await this.stockAnalysisAgentService.runAnalysisForTickers(tickers);
     // This is the declarative way to run the analysis

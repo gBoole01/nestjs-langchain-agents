@@ -78,7 +78,7 @@ export class JournalistAgentService implements OnModuleInit {
         agent,
         tools,
         maxIterations: 10,
-        verbose: this.configService.get('NODE_ENV') === 'development',
+        verbose: this.configService.get('VERBOSE') === 'true',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
       });

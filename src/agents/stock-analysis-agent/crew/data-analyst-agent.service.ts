@@ -8,11 +8,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
-import {
-  AgentResult,
-  AnalysisRequest,
-  DataAnalysisResult,
-} from '../stock-analysis-agent.types';
+import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 
 @Injectable()
 export class DataAnalystAgentService implements OnModuleInit {
@@ -76,7 +72,7 @@ Your goal is to provide a professional, data-driven report based on factual info
         agent,
         tools,
         maxIterations: 8,
-        verbose: this.configService.get('NODE_ENV') === 'development',
+        verbose: this.configService.get('VERBOSE') === 'true',
         returnIntermediateSteps:
           this.configService.get('NODE_ENV') === 'development',
       });
@@ -148,47 +144,5 @@ You MUST NOT provide any analysis if the tool call fails.`;
       this.logger.error('Data analysis failed:', error.message);
       return { success: false, error: error.message };
     }
-  }
-
-  private parseDataAnalysis(output: string): DataAnalysisResult {
-    this.logger.log(`Raw data analysis output: ${output}`);
-
-    try {
-      const jsonMatch = output.match(/\{{[\s\S]*?\}}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        this.logger.log(
-          `Parsed data analysis: ${JSON.stringify(parsed, null, 2)}`,
-        );
-        return parsed;
-      }
-    } catch (e) {
-      this.logger.warn(
-        'Could not parse JSON from data analysis output',
-        e.message,
-      );
-    }
-
-    // Enhanced fallback with error indication
-    return {
-      stockData: {
-        currentPrice: null,
-        volume: null,
-        change: null,
-        dataSource: 'failed_to_retrieve',
-      },
-      technicalIndicators: { rsi: null, ma20: null, ma50: null },
-      historicalTrends: {
-        trend: 'data_unavailable',
-        volatility: 'data_unavailable',
-        support: null,
-        resistance: null,
-      },
-      dataRetrievalStatus: {
-        success: false,
-        toolsUsed: [],
-        errors: ['Failed to parse agent output'],
-      },
-    };
   }
 }

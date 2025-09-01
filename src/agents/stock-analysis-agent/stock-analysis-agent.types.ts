@@ -41,3 +41,10 @@ export interface FinalReport {
   sentiment: string;
   recommendations?: string[];
 }
+
+export interface PortfolioItem {
+  ticker: string;
+  shares: number;
+  currentPrice: number;
+  valueInEUR: number;
+}

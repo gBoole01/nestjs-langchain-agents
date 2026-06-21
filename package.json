@@ -20,9 +20,10 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@langchain/community": "^0.3.50",
+    "@langchain/community": "^0.3.55",
     "@langchain/google-genai": "^0.2.16",
     "@langchain/langgraph": "^0.4.5",
+    "@langchain/mongodb": "^0.1.0",
     "@langchain/openai": "^0.6.7",
     "@langchain/tavily": "^0.1.5",
     "@nestjs/axios": "^4.0.1",
@@ -35,6 +36,7 @@
     "cheerio": "^1.1.0",
     "chromadb": "^3.0.14",
     "langchain": "^0.3.30",
+    "mongodb": "^6.19.0",
     "mongoose": "^8.17.1",
     "puppeteer": "^24.16.0",
     "reflect-metadata": "^0.2.0",

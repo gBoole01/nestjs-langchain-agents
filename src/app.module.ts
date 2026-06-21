@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { GlobalAnalysisAgentModule } from './agents/global-analysis-agent/global-analysis-agent.module';
 import { ReportSchema } from './agents/stock-analysis-agent/models/reports.model';
 import { StockAnalysisAgentModule } from './agents/stock-analysis-agent/stock-analysis-agent.module';
 import { AppController } from './app.controller';
@@ -79,6 +80,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
     TiingoModule,
     PortfolioModule,
     StockAnalysisAgentModule,
+    GlobalAnalysisAgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

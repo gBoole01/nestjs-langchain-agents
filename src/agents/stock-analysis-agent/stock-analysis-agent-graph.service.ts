@@ -9,6 +9,10 @@ import { JournalistAgentService } from './crew/journalist-agent.service';
 import { PortfolioAnalystAgentService } from './crew/portfolio-analyst.service';
 import { WriterAgentService } from './crew/writer-agent.service';
 
+/**
+ * This agent will run everyday for each monitored stock (either portfolio or watchlist).
+ * TIMEFRAME: 1-3 months
+ */
 @Injectable()
 export class StockAnalysisAgentGraphService implements OnModuleInit {
   private readonly logger = new Logger(StockAnalysisAgentGraphService.name);

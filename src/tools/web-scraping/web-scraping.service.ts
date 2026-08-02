@@ -5,6 +5,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as cheerio from 'cheerio';
 import puppeteer, { Browser } from 'puppeteer';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { WebSearchResult } from 'src/tools/serper/serper.types';
 
 export type EnrichedSearchResult = {
@@ -34,6 +35,8 @@ export class WebScrapingService {
       model: geminiModel,
       temperature: 0.1,
       maxOutputTokens: 8192,
+      maxRetries: 8,
+      onFailedAttempt: geminiOnFailedAttempt,
     });
   }
 

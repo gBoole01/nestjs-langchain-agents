@@ -1,14 +1,8 @@
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AgentExecutor,
-  createToolCallingAgent,
-} from '@langchain/classic/agents';
+import { createAgent } from 'langchain';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import {
   AgentResult,
   DataAnalysisResult,
@@ -31,7 +25,7 @@ export interface WriteReportInput {
 @Injectable()
 export class WriterAgentService implements OnModuleInit {
   private readonly logger = new Logger(WriterAgentService.name);
-  private agentExecutor: AgentExecutor | null = null;
+  private agent;
   private isInitialized = false;
 
   constructor(private readonly configService: ConfigService) {}
@@ -54,44 +48,30 @@ export class WriterAgentService implements OnModuleInit {
         model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
+        maxRetries: 8,
+        onFailedAttempt: geminiOnFailedAttempt,
       });
 
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          `You are a professional financial journalist tasked with writing a comprehensive report for a stock.
-          Your report must be:
-          -   Objective and factual, based only on the provided data.
-          -   Well-structured with clear headings.
-          -   Easy to read for a non-expert audience.
-          -   Insightful, explaining the "why" behind the market movements.
-          -   **Crucially, you must incorporate the user's personal portfolio data to provide actionable, tailored advice in the conclusion.**
-
-          Report Structure:
-          -   **Executive Summary:** A brief, punchy summary of the stock's recent performance.
-          -   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
-          -   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
-          -   **Broader Context:** Situate the stock within the relevant global macroeconomic, regional and sector outlook provided to you.
-          -   **Conclusion & Portfolio Action:** Provide a final, balanced assessment and, based on the user's portfolio, offer a concrete, actionable recommendation.
-
-          You will be provided with technical data, news analysis, a previous report, and broader global/regional/sector context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
-          `,
-        ],
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-      ]);
-
-      const agent = createToolCallingAgent({
-        llm: model,
+      this.agent = createAgent({
+        model,
         tools: [],
-        prompt,
-      });
-      this.agentExecutor = new AgentExecutor({
-        agent,
-        tools: [],
-        verbose: this.configService.get('VERBOSE') === 'true',
-        returnIntermediateSteps:
-          this.configService.get('NODE_ENV') === 'development',
+        systemPrompt: `You are a professional financial journalist tasked with writing a comprehensive report for a stock.
+Your report must be:
+-   Objective and factual, based only on the provided data.
+-   Well-structured with clear headings.
+-   Easy to read for a non-expert audience.
+-   Insightful, explaining the "why" behind the market movements.
+-   **Crucially, you must incorporate the user's personal portfolio data to provide actionable, tailored advice in the conclusion.**
+
+Report Structure:
+-   **Executive Summary:** A brief, punchy summary of the stock's recent performance.
+-   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
+-   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
+-   **Broader Context:** Situate the stock within the relevant global macroeconomic, regional and sector outlook provided to you.
+-   **Conclusion & Portfolio Action:** Provide a final, balanced assessment and, based on the user's portfolio, offer a concrete, actionable recommendation.
+
+You will be provided with technical data, news analysis, a previous report, and broader global/regional/sector context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
+`,
       });
 
       this.isInitialized = true;
@@ -124,7 +104,7 @@ export class WriterAgentService implements OnModuleInit {
     } = input;
 
     try {
-      if (!this.isInitialized || !this.agentExecutor) {
+      if (!this.isInitialized || !this.agent) {
         await this.initializeAgent();
         if (!this.isInitialized) {
           return { success: false, error: 'Agent initialization failed' };
@@ -168,11 +148,18 @@ Ensure you address all points and resubmit a high-quality, final report.
 `;
       }
 
-      const result = await this.agentExecutor.invoke({ input: promptInput });
+      const result = await this.agent.invoke({
+        messages: [{ role: 'user', content: promptInput }],
+      });
+      const lastMessage = result.messages[result.messages.length - 1];
+      const output =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
       return {
         success: true,
-        data: result.output,
+        data: output,
         metadata: { agent: 'writer', timestamp: new Date().toISOString() },
       };
     } catch (error) {

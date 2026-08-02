@@ -5,6 +5,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
 
@@ -39,6 +40,8 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
       model: geminiModel,
       temperature: 0.1,
       maxOutputTokens: 8192,
+      maxRetries: 8,
+      onFailedAttempt: geminiOnFailedAttempt,
     });
     this.initializeWorkflow();
     this.logger.log('Sectorial Analysis Agent initialized with LangGraph');
@@ -79,18 +82,22 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
         const prompt = ChatPromptTemplate.fromMessages([
           [
             'system',
-            `You are a highly skilled sector/industry analyst. Your task is to write a comprehensive outlook report for the sector: ${state.sector}.
+            `You are a highly skilled sector/industry analyst. Your task is to write a comprehensive outlook report for the sector: {sector}.
              Use the following new data and historical context to inform your analysis.
-             New Data: ${state.rawData}
-             Historical Context: ${state.historicalContext}`,
+             New Data: {raw_data}
+             Historical Context: {historical_context}`,
           ],
           [
             'human',
-            `Please write a well-structured and insightful sector outlook report for ${state.sector}.`,
+            'Please write a well-structured and insightful sector outlook report for {sector}.',
           ],
         ]);
         const chain = prompt.pipe(this.model);
-        const finalReport = await chain.invoke({});
+        const finalReport = await chain.invoke({
+          sector: state.sector,
+          raw_data: state.rawData,
+          historical_context: state.historicalContext,
+        });
         return { finalReport: finalReport.content };
       })
 

@@ -1,15 +1,9 @@
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
-import { StructuredToolInterface } from '@langchain/core/tools';
+import { isAIMessage } from '@langchain/core/messages';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AgentExecutor,
-  createToolCallingAgent,
-} from '@langchain/classic/agents';
+import { createAgent } from 'langchain';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
 import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
@@ -18,7 +12,7 @@ import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 @Injectable()
 export class JournalistAgentService implements OnModuleInit {
   private readonly logger = new Logger(JournalistAgentService.name);
-  private agentExecutor: AgentExecutor | null = null;
+  private agent;
   private isInitialized = false;
 
   constructor(
@@ -46,18 +40,18 @@ export class JournalistAgentService implements OnModuleInit {
         model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
+        maxRetries: 8,
+        onFailedAttempt: geminiOnFailedAttempt,
       });
 
-      const tools: StructuredToolInterface[] = [
-        this.serperNewsTool.getTool(),
-        this.serperWebTool.getTool(),
-        this.webScrapingTool.getTool(),
-      ];
-
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          `You are a professional financial journalist specializing in market news and sentiment analysis. Your role is to provide a comprehensive, data-backed summary of significant news and events affecting a given stock.
+      this.agent = createAgent({
+        model,
+        tools: [
+          this.serperNewsTool.getTool(),
+          this.serperWebTool.getTool(),
+          this.webScrapingTool.getTool(),
+        ],
+        systemPrompt: `You are a professional financial journalist specializing in market news and sentiment analysis. Your role is to provide a comprehensive, data-backed summary of significant news and events affecting a given stock.
 
 **Your Workflow:**
 1.  **News Gathering:** You MUST use the \`serper_news_search\` tool to find recent and relevant news articles for the requested stock ticker.
@@ -71,19 +65,6 @@ export class JournalistAgentService implements OnModuleInit {
 -   **No Hallucination:** If no news can be found, you MUST explicitly state this. Do not invent news stories or analysis.
 -   **Actionable Insights:** Focus on the "why"—explaining the potential implications of the news for the stock's price and investor sentiment.
 `,
-        ],
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-      ]);
-
-      const agent = createToolCallingAgent({ llm: model, tools, prompt });
-      this.agentExecutor = new AgentExecutor({
-        agent,
-        tools,
-        maxIterations: 10,
-        verbose: this.configService.get('VERBOSE') === 'true',
-        returnIntermediateSteps:
-          this.configService.get('NODE_ENV') === 'development',
       });
 
       this.isInitialized = true;
@@ -99,7 +80,7 @@ export class JournalistAgentService implements OnModuleInit {
 
   async analyzeNews(request: AnalysisRequest): Promise<AgentResult> {
     try {
-      if (!this.isInitialized || !this.agentExecutor) {
+      if (!this.isInitialized || !this.agent) {
         await this.initializeAgent();
         if (!this.isInitialized) {
           return { success: false, error: 'Agent initialization failed' };
@@ -129,25 +110,34 @@ You MUST NOT provide an analysis if no news articles are found. Instead, simply 
 `;
       this.logger.log(`Executing news analysis query: ${query}`);
 
-      const result = await this.agentExecutor.invoke({ input: query });
+      const result = await this.agent.invoke({
+        messages: [{ role: 'user', content: query }],
+      });
+      const lastMessage = result.messages[result.messages.length - 1];
+      const output =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
-      // Log intermediate steps to see what tools were called
-      if (result.intermediateSteps) {
+      const toolCalls = result.messages.filter(
+        (message) => isAIMessage(message) && message.tool_calls?.length,
+      );
+      if (toolCalls.length > 0) {
         this.logger.log('News analysis tool calls made:');
-        result.intermediateSteps.forEach((step, index) => {
+        toolCalls.forEach((message, index) => {
           this.logger.log(
-            `Step ${index + 1}: ${JSON.stringify(step, null, 2)}`,
+            `Step ${index + 1}: ${JSON.stringify(message.tool_calls, null, 2)}`,
           );
         });
       }
 
       return {
         success: true,
-        data: result.output,
+        data: output,
         metadata: {
           agent: 'journalist',
           timestamp: new Date().toISOString(),
-          toolCalls: result.intermediateSteps || [],
+          toolCalls,
         },
       };
     } catch (error) {

@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Get,
   HttpCode,
@@ -13,7 +12,6 @@ import { BroaderReportDocument } from 'src/agents/broader-analysis/models/broade
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
-import { RunGlobalAnalysisDto } from './dto/run-global-analysis.dto';
 import { GlobalAnalysisAgentService } from './global-analysis-agent.service';
 
 @Controller('global-analysis')
@@ -26,9 +24,9 @@ export class GlobalAnalysisAgentController {
 
   @Post('runs')
   @HttpCode(202)
-  run(@Body() dto: RunGlobalAnalysisDto): RunRecord {
-    return this.analysisRunsService.start('global-analysis', dto, () =>
-      this.globalAnalysisAgentService.runAnalysis(dto.query),
+  run(): RunRecord {
+    return this.analysisRunsService.start('global-analysis', {}, () =>
+      this.globalAnalysisAgentService.runAnalysis(),
     );
   }
 

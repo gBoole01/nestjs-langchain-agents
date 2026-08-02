@@ -1,22 +1,16 @@
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
-import { StructuredToolInterface } from '@langchain/core/tools';
+import { isAIMessage } from '@langchain/core/messages';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AgentExecutor,
-  createToolCallingAgent,
-} from '@langchain/classic/agents';
+import { createAgent } from 'langchain';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
 import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 
 @Injectable()
 export class DataAnalystAgentService implements OnModuleInit {
   private readonly logger = new Logger(DataAnalystAgentService.name);
-  private agentExecutor: AgentExecutor | null = null;
+  private agent;
   private isInitialized = false;
 
   constructor(
@@ -42,16 +36,14 @@ export class DataAnalystAgentService implements OnModuleInit {
         model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
+        maxRetries: 8,
+        onFailedAttempt: geminiOnFailedAttempt,
       });
 
-      const tools: StructuredToolInterface[] = [
-        this.fetchStockDataTool.getTool(),
-      ];
-
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          `You are a highly skilled financial data analyst. Your primary function is to perform technical analysis on stock market data to provide actionable insights.
+      this.agent = createAgent({
+        model,
+        tools: [this.fetchStockDataTool.getTool()],
+        systemPrompt: `You are a highly skilled financial data analyst. Your primary function is to perform technical analysis on stock market data to provide actionable insights.
 
 **Your Workflow:**
 1.  **Data Retrieval:** For any given stock ticker and date range, you MUST use the \`fetch_stock_market_data\` tool to retrieve real historical stock data.
@@ -65,19 +57,6 @@ export class DataAnalystAgentService implements OnModuleInit {
 -   **Error Handling:** If the tool fails or no data is returned, explicitly state that data could not be retrieved and do not proceed with any analysis.
 
 Your goal is to provide a professional, data-driven report based on factual information from the tool.`,
-        ],
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-      ]);
-
-      const agent = createToolCallingAgent({ llm: model, tools, prompt });
-      this.agentExecutor = new AgentExecutor({
-        agent,
-        tools,
-        maxIterations: 8,
-        verbose: this.configService.get('VERBOSE') === 'true',
-        returnIntermediateSteps:
-          this.configService.get('NODE_ENV') === 'development',
       });
 
       this.isInitialized = true;
@@ -93,7 +72,7 @@ Your goal is to provide a professional, data-driven report based on factual info
 
   async analyzeData(request: AnalysisRequest): Promise<AgentResult> {
     try {
-      if (!this.isInitialized || !this.agentExecutor) {
+      if (!this.isInitialized || !this.agent) {
         await this.initializeAgent();
         if (!this.isInitialized) {
           return { success: false, error: 'Agent initialization failed' };
@@ -123,24 +102,34 @@ You MUST NOT provide any analysis if the tool call fails.`;
 
       this.logger.log(`Executing data analysis query: ${query}`);
 
-      const result = await this.agentExecutor.invoke({ input: query });
+      const result = await this.agent.invoke({
+        messages: [{ role: 'user', content: query }],
+      });
+      const lastMessage = result.messages[result.messages.length - 1];
+      const output =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
-      if (result.intermediateSteps) {
+      const toolCalls = result.messages.filter(
+        (message) => isAIMessage(message) && message.tool_calls?.length,
+      );
+      if (toolCalls.length > 0) {
         this.logger.log('Tool calls made:');
-        result.intermediateSteps.forEach((step, index) => {
+        toolCalls.forEach((message, index) => {
           this.logger.log(
-            `Step ${index + 1}: ${JSON.stringify(step, null, 2)}`,
+            `Step ${index + 1}: ${JSON.stringify(message.tool_calls, null, 2)}`,
           );
         });
       }
 
       return {
         success: true,
-        data: result.output,
+        data: output,
         metadata: {
           agent: 'data-analyst',
           timestamp: new Date().toISOString(),
-          toolCalls: result.intermediateSteps || [],
+          toolCalls,
         },
       };
     } catch (error) {

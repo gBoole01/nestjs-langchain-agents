@@ -1,10 +1,5 @@
 import { Document } from '@langchain/core/documents';
 import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
-import { StructuredToolInterface } from '@langchain/core/tools';
-import {
   ChatGoogleGenerativeAI,
   GoogleGenerativeAIEmbeddings,
 } from '@langchain/google-genai';
@@ -12,11 +7,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ChromaClient, EmbeddingFunction } from 'chromadb';
-import {
-  AgentExecutor,
-  createToolCallingAgent,
-} from '@langchain/classic/agents';
+import { createAgent } from 'langchain';
 import { Model } from 'mongoose';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { Report, ReportDocument } from '../models/reports.model';
 import { AgentResult } from '../stock-analysis-agent.types';
@@ -24,7 +17,7 @@ import { AgentResult } from '../stock-analysis-agent.types';
 @Injectable()
 export class ArchivistAgentService implements OnModuleInit {
   private readonly logger = new Logger(ArchivistAgentService.name);
-  private agentExecutor: AgentExecutor | null = null;
+  private agent;
   private isInitialized = false;
   private embeddings: GoogleGenerativeAIEmbeddings; // Remove 'null'
   private chromaCollection: any;
@@ -86,42 +79,23 @@ export class ArchivistAgentService implements OnModuleInit {
         model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
+        maxRetries: 8,
+        onFailedAttempt: geminiOnFailedAttempt,
       });
 
-      const tools: StructuredToolInterface[] = [
-        this.reportRetrievalTool.getTool(),
-      ];
-
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          `You are the Archivist Agent, a highly specialized financial researcher. Your sole purpose is to retrieve, synthesize, and provide context from historical financial reports.
-
-          You are equipped with a single, powerful tool: "retrieve_reports." This is the only way you can access historical data.
-
-          Your workflow is as follows:
-          1. Upon receiving a query, you MUST first use the "retrieve_reports" tool to find all relevant historical reports.
-          2. You will then use the information returned from the tool to synthesize a concise, high-level summary.
-          3. The final output must be a single paragraph that provides a clear and "informed opinion" based solely on the retrieved historical data.
-
-          Never attempt to answer a query without first using your tool. Your entire existence is to use this tool to provide information.`.trim(),
-        ],
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-      ]);
-
-      const agent = createToolCallingAgent({
-        llm: model,
-        tools,
-        prompt,
-      });
-
-      this.agentExecutor = new AgentExecutor({
-        agent,
+      this.agent = createAgent({
+        model,
         tools: [this.reportRetrievalTool.getTool()],
-        verbose: this.configService.get('VERBOSE') === 'true',
-        returnIntermediateSteps:
-          this.configService.get('NODE_ENV') === 'development',
+        systemPrompt: `You are the Archivist Agent, a highly specialized financial researcher. Your sole purpose is to retrieve, synthesize, and provide context from historical financial reports.
+
+You are equipped with a single, powerful tool: "retrieve_reports." This is the only way you can access historical data.
+
+Your workflow is as follows:
+1. Upon receiving a query, you MUST first use the "retrieve_reports" tool to find all relevant historical reports.
+2. You will then use the information returned from the tool to synthesize a concise, high-level summary.
+3. The final output must be a single paragraph that provides a clear and "informed opinion" based solely on the retrieved historical data.
+
+Never attempt to answer a query without first using your tool. Your entire existence is to use this tool to provide information.`,
       });
 
       this.isInitialized = true;
@@ -138,7 +112,7 @@ export class ArchivistAgentService implements OnModuleInit {
    * @returns A synthesized string of past analysis or null if the agent fails.
    */
   async getInformedOpinion(query: string): Promise<string | null> {
-    if (!this.isInitialized || !this.agentExecutor) {
+    if (!this.isInitialized || !this.agent) {
       this.logger.warn(
         'Archivist Agent is not initialized. Cannot provide an informed opinion.',
       );
@@ -147,8 +121,14 @@ export class ArchivistAgentService implements OnModuleInit {
 
     try {
       this.logger.log(`Generating informed opinion for query "${query}"...`);
-      const result = await this.agentExecutor.invoke({ input: query });
-      const opinion = result.output as string;
+      const result = await this.agent.invoke({
+        messages: [{ role: 'user', content: query }],
+      });
+      const lastMessage = result.messages[result.messages.length - 1];
+      const opinion =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
       this.logger.log(`Informed opinion for query "${query}" generated.`);
       this.logger.log(`Agent output: ${opinion}`);

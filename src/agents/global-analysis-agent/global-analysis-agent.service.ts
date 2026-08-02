@@ -3,8 +3,11 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Annotation, END, StateGraph } from '@langchain/langgraph';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
+
+const GLOBAL_ANALYSIS_SUBJECT = 'global economic outlook';
 
 @Injectable()
 export class GlobalAnalysisAgentService implements OnModuleInit {
@@ -31,6 +34,8 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
       model: geminiModel,
       temperature: 0.1,
       maxOutputTokens: 8192,
+      maxRetries: 8,
+      onFailedAttempt: geminiOnFailedAttempt,
     });
     this.initializeWorkflow();
     this.logger.log('Global Analyst Service initialized with LangGraph');
@@ -39,7 +44,6 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
   private initializeWorkflow() {
     // Define the state schema using Annotation.Root
     const GlobalAnalysisState = Annotation.Root({
-      query: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
       finalReport: Annotation<string>(),
@@ -48,9 +52,11 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
     // The entire workflow is built in a single, chained sequence
     this.workflow = new StateGraph(GlobalAnalysisState)
       // Node 1: Call the Research Team to fetch new data
-      .addNode('fetch_new_data', async (state) => {
+      .addNode('fetch_new_data', async () => {
         this.logger.log('Step 1: Calling Research Team for fresh data...');
-        const rawData = await this.researchTeam.runQuery(state.query);
+        const rawData = await this.researchTeam.runQuery(
+          GLOBAL_ANALYSIS_SUBJECT,
+        );
         return { rawData: rawData };
       })
 
@@ -61,7 +67,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
         );
         await this.archivist.storeRawData(state.rawData);
         const historicalContext = await this.archivist.retrieveData(
-          state.query,
+          GLOBAL_ANALYSIS_SUBJECT,
         );
         return { historicalContext: historicalContext };
       })
@@ -74,8 +80,8 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
             'system',
             `You are a highly skilled macroeconomic analyst. Your task is to write a comprehensive global economic report.
              Use the following new data and historical context to inform your analysis.
-             New Data: ${state.rawData}
-             Historical Context: ${state.historicalContext}`,
+             New Data: {raw_data}
+             Historical Context: {historical_context}`,
           ],
           [
             'human',
@@ -83,14 +89,20 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
           ],
         ]);
         const chain = prompt.pipe(this.model);
-        const finalReport = await chain.invoke({});
+        const finalReport = await chain.invoke({
+          raw_data: state.rawData,
+          historical_context: state.historicalContext,
+        });
         return { finalReport: finalReport.content };
       })
 
       // Node 4: Archive the final report
       .addNode('archive_final_report', async (state) => {
         this.logger.log('Step 4: Archiving the final report...');
-        await this.archivist.storeFinalReport(state.query, state.finalReport);
+        await this.archivist.storeFinalReport(
+          GLOBAL_ANALYSIS_SUBJECT,
+          state.finalReport,
+        );
         return {};
       })
 
@@ -105,12 +117,13 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
       .compile();
   }
   /**
-   * Runs the entire global analysis workflow.
-   * @param query The user's query for the report (e.g., "global economic outlook").
+   * Runs the entire global analysis workflow against the broad world
+   * economic situation. Takes no input — unlike the geographical/sectorial
+   * agents, there is only one global subject to analyze.
    */
-  async runAnalysis(query: string): Promise<string> {
-    this.logger.log(`Running global analysis for query: ${query}`);
-    const result = await this.workflow.invoke({ query });
+  async runAnalysis(): Promise<string> {
+    this.logger.log('Running global analysis...');
+    const result = await this.workflow.invoke({});
     this.logger.log('Global analysis complete.');
     return result.finalReport || 'No report generated.';
   }

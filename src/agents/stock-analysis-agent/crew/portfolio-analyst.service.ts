@@ -1,22 +1,16 @@
-import {
-  ChatPromptTemplate,
-  MessagesPlaceholder,
-} from '@langchain/core/prompts';
-import { StructuredToolInterface } from '@langchain/core/tools';
+import { isAIMessage } from '@langchain/core/messages';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  AgentExecutor,
-  createToolCallingAgent,
-} from '@langchain/classic/agents';
+import { createAgent } from 'langchain';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { PortfolioTool } from 'src/tools/portfolio/portfolio.tool';
 import { AgentResult } from '../stock-analysis-agent.types';
 
 @Injectable()
 export class PortfolioAnalystAgentService implements OnModuleInit {
   private readonly logger = new Logger(PortfolioAnalystAgentService.name);
-  private agentExecutor: AgentExecutor | null = null;
+  private agent;
   private isInitialized = false;
 
   constructor(
@@ -42,14 +36,14 @@ export class PortfolioAnalystAgentService implements OnModuleInit {
         model: geminiModel,
         temperature: 0.1,
         maxOutputTokens: 8192,
+        maxRetries: 8,
+        onFailedAttempt: geminiOnFailedAttempt,
       });
 
-      const tools: StructuredToolInterface[] = [this.portfolioTool.getTool()];
-
-      const prompt = ChatPromptTemplate.fromMessages([
-        [
-          'system',
-          `You are a highly skilled portfolio analyst. Your primary function is to analyze a user's entire stock portfolio to provide insights and summaries.
+      this.agent = createAgent({
+        model,
+        tools: [this.portfolioTool.getTool()],
+        systemPrompt: `You are a highly skilled portfolio analyst. Your primary function is to analyze a user's entire stock portfolio to provide insights and summaries.
 
 **Your Workflow:**
 1.  **Data Retrieval:** You MUST use the \`get_portfolio\` tool immediately upon receiving a request. This is the only way you can access the portfolio holdings.
@@ -63,19 +57,6 @@ export class PortfolioAnalystAgentService implements OnModuleInit {
 -   **Error Handling:** If the tool fails or no data is returned, explicitly state that the portfolio could not be retrieved and do not proceed with any analysis.
 
 Your goal is to provide a professional, data-driven report based on factual information from the tool.`,
-        ],
-        ['human', '{input}'],
-        new MessagesPlaceholder('agent_scratchpad'),
-      ]);
-
-      const agent = createToolCallingAgent({ llm: model, tools, prompt });
-      this.agentExecutor = new AgentExecutor({
-        agent,
-        tools,
-        maxIterations: 8,
-        verbose: this.configService.get('VERBOSE') === 'true',
-        returnIntermediateSteps:
-          this.configService.get('NODE_ENV') === 'development',
       });
 
       this.isInitialized = true;
@@ -91,7 +72,7 @@ Your goal is to provide a professional, data-driven report based on factual info
 
   async analyzePortfolio(): Promise<AgentResult> {
     try {
-      if (!this.isInitialized || !this.agentExecutor) {
+      if (!this.isInitialized || !this.agent) {
         await this.initializeAgent();
         if (!this.isInitialized) {
           return { success: false, error: 'Agent initialization failed' };
@@ -102,24 +83,34 @@ Your goal is to provide a professional, data-driven report based on factual info
 
       this.logger.log(`Executing portfolio analysis query...`);
 
-      const result = await this.agentExecutor.invoke({ input: query });
+      const result = await this.agent.invoke({
+        messages: [{ role: 'user', content: query }],
+      });
+      const lastMessage = result.messages[result.messages.length - 1];
+      const output =
+        typeof lastMessage.content === 'string'
+          ? lastMessage.content
+          : JSON.stringify(lastMessage.content);
 
-      if (result.intermediateSteps) {
+      const toolCalls = result.messages.filter(
+        (message) => isAIMessage(message) && message.tool_calls?.length,
+      );
+      if (toolCalls.length > 0) {
         this.logger.log('Tool calls made:');
-        result.intermediateSteps.forEach((step, index) => {
+        toolCalls.forEach((message, index) => {
           this.logger.log(
-            `Step ${index + 1}: ${JSON.stringify(step, null, 2)}`,
+            `Step ${index + 1}: ${JSON.stringify(message.tool_calls, null, 2)}`,
           );
         });
       }
 
       return {
         success: true,
-        data: result.output,
+        data: output,
         metadata: {
           agent: 'portfolio-analyst',
           timestamp: new Date().toISOString(),
-          toolCalls: result.intermediateSteps || [],
+          toolCalls,
         },
       };
     } catch (error) {

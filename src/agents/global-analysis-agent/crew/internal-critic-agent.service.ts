@@ -3,6 +3,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { z } from 'zod';
 
 // Define the structured output for the critic's verdict
@@ -25,6 +26,8 @@ export class InternalCriticAgent {
       apiKey: googleApiKey,
       model: this.configService.get<string>('GEMINI_MODEL'),
       temperature: 0.1,
+      maxRetries: 8,
+      onFailedAttempt: geminiOnFailedAttempt,
     });
   }
 
@@ -41,16 +44,16 @@ export class InternalCriticAgent {
         
         Provide a verdict of 'PASS' if the data is high-quality and relevant, and 'FAIL' if it is not.
         Your output MUST be a valid JSON object with the following schema:
-        { "verdict": "PASS" | "FAIL", "feedback": "brief explanation" }`,
+        {{ "verdict": "PASS" | "FAIL", "feedback": "brief explanation" }}`,
       ],
-      ['human', `Please evaluate the following raw data:\n\n${rawData}`],
+      ['human', 'Please evaluate the following raw data:\n\n{raw_data}'],
     ]);
 
     const parser = new JsonOutputParser<CriticVerdict>();
     const chain = prompt.pipe(this.model).pipe(parser);
 
     try {
-      const result = await chain.invoke({});
+      const result = await chain.invoke({ raw_data: rawData });
       return result;
     } catch (error) {
       this.logger.error(

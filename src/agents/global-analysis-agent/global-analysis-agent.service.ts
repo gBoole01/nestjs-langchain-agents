@@ -114,4 +114,14 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
     this.logger.log('Global analysis complete.');
     return result.finalReport || 'No report generated.';
   }
+
+  /**
+   * Cheap, read-only retrieval of the most relevant archived global economic
+   * reports, without re-running the full research/critique/synthesis
+   * pipeline. Used by other agents (e.g. the daily stock analysis graph)
+   * that need macro context but must not trigger a fresh global analysis run.
+   */
+  async getContext(query: string): Promise<string> {
+    return this.archivist.retrieveData(query);
+  }
 }

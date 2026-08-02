@@ -12,6 +12,19 @@ import {
   NewsAnalysisResult,
 } from '../stock-analysis-agent.types';
 
+export interface WriteReportInput {
+  ticker: string;
+  date: string;
+  dataAnalysis: DataAnalysisResult;
+  newsAnalysis: NewsAnalysisResult;
+  portfolioAnalysis: string;
+  archivistReport: string;
+  globalReport: string;
+  geoReport: string;
+  sectorReport: string;
+  feedback?: string;
+}
+
 @Injectable()
 export class WriterAgentService implements OnModuleInit {
   private readonly logger = new Logger(WriterAgentService.name);
@@ -55,9 +68,10 @@ export class WriterAgentService implements OnModuleInit {
           -   **Executive Summary:** A brief, punchy summary of the stock's recent performance.
           -   **Technical Analysis:** Elaborate on the price trends, volume, and support/resistance levels.
           -   **Market Activity & News Impact:** Discuss how recent news and market sentiment have affected the stock.
+          -   **Broader Context:** Situate the stock within the relevant global macroeconomic, regional and sector outlook provided to you.
           -   **Conclusion & Portfolio Action:** Provide a final, balanced assessment and, based on the user's portfolio, offer a concrete, actionable recommendation.
 
-          You will be provided with technical data, news analysis, and a previous report for context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
+          You will be provided with technical data, news analysis, a previous report, and broader global/regional/sector context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
           `,
         ],
         new MessagesPlaceholder('agent_scratchpad'),
@@ -87,24 +101,25 @@ export class WriterAgentService implements OnModuleInit {
 
   /**
    * Generates or revises a financial report based on new data and previous memory.
-   * @param ticker The stock ticker symbol.
-   * @param date The current date of the analysis.
-   * @param dataAnalysis The technical data analysis result.
-   * @param newsAnalysis The news and sentiment analysis result.
-   * @param portfolioAnalysis The user's portfolio holdings.
-   * @param archivistReport The previous report memory for context.
-   * @param feedback Optional feedback from a critic to revise the report.
+   * @param input The report inputs: ticker/date, technical + news analysis,
+   * portfolio holdings, prior archivist report, broader global/regional/sector
+   * context, and optional critic feedback to incorporate.
    * @returns An AgentResult containing the generated report or an error.
    */
-  async writeReport(
-    ticker: string,
-    date: string,
-    dataAnalysis: DataAnalysisResult,
-    newsAnalysis: NewsAnalysisResult,
-    archivistReport: string,
-    feedback: string,
-    portfolioAnalysis: string,
-  ): Promise<AgentResult> {
+  async writeReport(input: WriteReportInput): Promise<AgentResult> {
+    const {
+      ticker,
+      date,
+      dataAnalysis,
+      newsAnalysis,
+      portfolioAnalysis,
+      archivistReport,
+      globalReport,
+      geoReport,
+      sectorReport,
+      feedback,
+    } = input;
+
     try {
       if (!this.isInitialized || !this.agentExecutor) {
         await this.initializeAgent();
@@ -113,7 +128,7 @@ export class WriterAgentService implements OnModuleInit {
         }
       }
 
-      let input = `
+      let promptInput = `
 Create a comprehensive financial analysis report for ticker ${ticker} as of ${date}.
 
 Use the following information as your source:
@@ -127,12 +142,21 @@ ${JSON.stringify(newsAnalysis, null, 2)}
 ### Archivist Report:
 ${archivistReport}
 
+### Global Economic Context:
+${globalReport}
+
+### Regional/Geographical Context:
+${geoReport}
+
+### Sector Context:
+${sectorReport}
+
 ### User's Portfolio:
 ${portfolioAnalysis}
 `;
 
       if (feedback) {
-        input += `
+        promptInput += `
 ### Revision Feedback:
 Your previous draft was not satisfactory. Please revise your report based on the following feedback:
 "${feedback}"
@@ -141,7 +165,7 @@ Ensure you address all points and resubmit a high-quality, final report.
 `;
       }
 
-      const result = await this.agentExecutor.invoke({ input });
+      const result = await this.agentExecutor.invoke({ input: promptInput });
 
       return {
         success: true,

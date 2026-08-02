@@ -1,11 +1,17 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { GeographicalAnalysisAgentService } from 'src/agents/geographical-analysis-agent/geographical-analysis-agent.service';
+import { GlobalAnalysisAgentService } from 'src/agents/global-analysis-agent/global-analysis-agent.service';
+import { SectorialAnalysisAgentService } from 'src/agents/sectorial-analysis-agent/sectorial-analysis-agent.service';
 import { DiscordService } from 'src/integrations/discord/discord.service';
+import { PortfolioService } from 'src/tools/portfolio/portfolio.service';
 import { ArchivistAgentService } from './crew/archivist-agent.service';
 import { CriticAgentService } from './crew/critic-agent.service';
 import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
 import { WriterAgentService } from './crew/writer-agent.service';
 import { AnalysisRequest } from './stock-analysis-agent.types';
+
+const NO_CONTEXT_MESSAGE = 'No region/sector mapped for this ticker.';
 
 @Injectable()
 export class StockAnalysisAgentService implements OnModuleInit {
@@ -18,6 +24,10 @@ export class StockAnalysisAgentService implements OnModuleInit {
     private readonly criticAgent: CriticAgentService,
     private readonly archivistAgent: ArchivistAgentService,
     private readonly discordService: DiscordService,
+    private readonly portfolioService: PortfolioService,
+    private readonly globalAnalysisAgent: GlobalAnalysisAgentService,
+    private readonly geographicalAnalysisAgent: GeographicalAnalysisAgentService,
+    private readonly sectorialAnalysisAgent: SectorialAnalysisAgentService,
   ) {}
 
   async onModuleInit() {
@@ -80,6 +90,21 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
       this.logger.log('Data and news analysis completed successfully');
 
+      // Step 2b: Pull broader macro/regional/sector context in parallel
+      const { region, sector } =
+        this.portfolioService.findRegionAndSector(ticker);
+      const [globalReport, geoReport, sectorReport] = await Promise.all([
+        this.globalAnalysisAgent.getContext(
+          `global economic outlook relevant to ${ticker}`,
+        ),
+        region
+          ? this.geographicalAnalysisAgent.getContext(region)
+          : Promise.resolve(NO_CONTEXT_MESSAGE),
+        sector
+          ? this.sectorialAnalysisAgent.getContext(sector)
+          : Promise.resolve(NO_CONTEXT_MESSAGE),
+      ]);
+
       // Step 3: Generate final report and submit to Critic Agent
       let finalReport = '';
       let currentDraft = '';
@@ -96,15 +121,18 @@ export class StockAnalysisAgentService implements OnModuleInit {
         iterationCount++;
 
         // Call the Writer Agent
-        const writerResult = await this.writerAgent.writeReport(
+        const writerResult = await this.writerAgent.writeReport({
           ticker,
           date,
-          dataResult.data,
-          newsResult.data,
+          dataAnalysis: dataResult.data,
+          newsAnalysis: newsResult.data,
+          portfolioAnalysis: '',
           archivistReport,
-          critiqueVerdict.feedback,
-          '',
-        );
+          globalReport,
+          geoReport,
+          sectorReport,
+          feedback: critiqueVerdict.feedback,
+        });
 
         if (!writerResult.success) {
           throw new Error(`Report generation failed: ${writerResult.error}`);
@@ -115,12 +143,15 @@ export class StockAnalysisAgentService implements OnModuleInit {
         );
 
         // Call the Critic Agent to evaluate the report
-        critiqueVerdict = await this.criticAgent.critiqueReport(
+        critiqueVerdict = await this.criticAgent.critiqueReport({
           report,
-          dataResult.data,
-          newsResult.data,
+          dataAnalysis: dataResult.data,
+          newsAnalysis: newsResult.data,
           archivistReport,
-        );
+          globalReport,
+          geoReport,
+          sectorReport,
+        });
 
         if (critiqueVerdict.verdict === 'PASS') {
           finalReport = report;

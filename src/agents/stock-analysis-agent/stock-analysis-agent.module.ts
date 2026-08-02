@@ -2,6 +2,9 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { GeographicalAnalysisAgentModule } from 'src/agents/geographical-analysis-agent/geographical-analysis-agent.module';
+import { GlobalAnalysisAgentModule } from 'src/agents/global-analysis-agent/global-analysis-agent.module';
+import { SectorialAnalysisAgentModule } from 'src/agents/sectorial-analysis-agent/sectorial-analysis-agent.module';
 import { PortfolioModule } from 'src/tools/portfolio/portfolio.module';
 import { ReportRetrievalModule } from '../../tools/rag/report-retrieval.module';
 import { SerperModule } from '../../tools/serper/serper.module';
@@ -27,6 +30,9 @@ import { StockAnalysisAgentService } from './stock-analysis-agent.service';
     WebScrapingModule,
     ReportRetrievalModule,
     PortfolioModule,
+    GlobalAnalysisAgentModule,
+    GeographicalAnalysisAgentModule,
+    SectorialAnalysisAgentModule,
     MongooseModule.forFeature([{ name: Report.name, schema: ReportSchema }]),
   ],
   providers: [

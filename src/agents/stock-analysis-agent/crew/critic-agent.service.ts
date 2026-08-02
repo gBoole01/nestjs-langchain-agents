@@ -7,6 +7,16 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 
+export interface CritiqueReportInput {
+  report: string;
+  dataAnalysis: any;
+  newsAnalysis: any;
+  archivistReport: string;
+  globalReport: string;
+  geoReport: string;
+  sectorReport: string;
+}
+
 @Injectable()
 export class CriticAgentService implements OnModuleInit {
   private readonly logger = new Logger(CriticAgentService.name);
@@ -74,10 +84,7 @@ export class CriticAgentService implements OnModuleInit {
   }
 
   async critiqueReport(
-    report: string,
-    dataAnalysis: any,
-    newsAnalysis: any,
-    archivistReport: string,
+    input: CritiqueReportInput,
   ): Promise<{ verdict: 'PASS' | 'FAIL'; feedback?: string }> {
     if (!this.isInitialized || !this.agentExecutor) {
       await this.initializeAgent();
@@ -86,8 +93,18 @@ export class CriticAgentService implements OnModuleInit {
       }
     }
 
-    const input = `
-      Please provide a constructive review of the following financial report. Evaluate its accuracy, clarity, and adherence to the source data.
+    const {
+      report,
+      dataAnalysis,
+      newsAnalysis,
+      archivistReport,
+      globalReport,
+      geoReport,
+      sectorReport,
+    } = input;
+
+    const promptInput = `
+      Please provide a constructive review of the following financial report. Evaluate its accuracy, clarity, and adherence to the source data (including the broader global/regional/sector context, which is also a valid source).
 
       ### Report to Review:
       ${report}
@@ -97,14 +114,23 @@ export class CriticAgentService implements OnModuleInit {
 
       ### Original News Analysis:
       ${JSON.stringify(newsAnalysis, null, 2)}
-      
+
       ### Archivist Report:
       ${archivistReport}
+
+      ### Global Economic Context:
+      ${globalReport}
+
+      ### Regional/Geographical Context:
+      ${geoReport}
+
+      ### Sector Context:
+      ${sectorReport}
 
       Based on your review, provide a verdict ('PASS' or 'REVISE') and detailed feedback.
     `;
 
-    const result = await this.agentExecutor.invoke({ input });
+    const result = await this.agentExecutor.invoke({ input: promptInput });
     const output = result.output as string;
 
     // Simple parsing logic to extract verdict and feedback

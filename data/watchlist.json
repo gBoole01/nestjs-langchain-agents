@@ -1,0 +1,17 @@
+[
+    {
+        "ticker": "PLTR",
+        "region": "United States",
+        "sector": "Software/Data Analytics"
+    },
+    {
+        "ticker": "MSCI WORLD",
+        "region": "Global",
+        "sector": "Equity Index"
+    },
+    {
+        "ticker": "TSLA",
+        "region": "United States",
+        "sector": "Automotive/EV"
+    }
+]

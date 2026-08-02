@@ -3,30 +3,40 @@
         "ticker": "DAX",
         "shares": 1.849842,
         "currentPrice": 218.65,
-        "valueInEUR": 404.47
+        "valueInEUR": 404.47,
+        "region": "Germany",
+        "sector": "Equity Index"
     },
     {
         "ticker": "S&P 500",
         "shares": 0.674926,
         "currentPrice": 589.46,
-        "valueInEUR": 397.84
+        "valueInEUR": 397.84,
+        "region": "United States",
+        "sector": "Equity Index"
     },
     {
         "ticker": "MSCI EUROPE",
         "shares": 2.959981,
         "currentPrice": 87.0,
-        "valueInEUR": 257.52
+        "valueInEUR": 257.52,
+        "region": "Europe",
+        "sector": "Equity Index"
     },
     {
         "ticker": "NVDA",
         "shares": 1.283524,
         "currentPrice": 148.74,
-        "valueInEUR": 190.91
+        "valueInEUR": 190.91,
+        "region": "United States",
+        "sector": "Semiconductors"
     },
     {
         "ticker": "GOLD",
         "shares": 1.423183,
         "currentPrice": 282.06,
-        "valueInEUR": 401.42
+        "valueInEUR": 401.42,
+        "region": "Global",
+        "sector": "Commodities"
     }
 ]

@@ -92,7 +92,7 @@ export class StockAnalysisAgentService implements OnModuleInit {
 
       // Step 2b: Pull broader macro/regional/sector context in parallel
       const { region, sector } =
-        this.portfolioService.findRegionAndSector(ticker);
+        await this.portfolioService.findRegionAndSector(ticker);
       const [globalReport, geoReport, sectorReport] = await Promise.all([
         this.globalAnalysisAgent.getContext(
           `global economic outlook relevant to ${ticker}`,

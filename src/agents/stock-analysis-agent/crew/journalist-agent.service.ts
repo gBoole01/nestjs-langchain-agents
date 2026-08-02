@@ -6,7 +6,10 @@ import { StructuredToolInterface } from '@langchain/core/tools';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
 import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
@@ -69,8 +72,8 @@ export class JournalistAgentService implements OnModuleInit {
 -   **Actionable Insights:** Focus on the "why"—explaining the potential implications of the news for the stock's price and investor sentiment.
 `,
         ],
-        new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
       ]);
 
       const agent = createToolCallingAgent({ llm: model, tools, prompt });

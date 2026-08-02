@@ -1,13 +1,26 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CatalogService } from './catalog.service';
+import { Holding, HoldingSchema } from './models/holding.model';
+import {
+  WatchedTicker,
+  WatchedTickerSchema,
+} from './models/watched-ticker.model';
 import { PortfolioController } from './portfolio.controller';
 import { PortfolioService } from './portfolio.service';
 import { PortfolioTool } from './portfolio.tool';
 
 @Module({
-  imports: [ConfigModule],
+  imports: [
+    ConfigModule,
+    MongooseModule.forFeature([
+      { name: Holding.name, schema: HoldingSchema },
+      { name: WatchedTicker.name, schema: WatchedTickerSchema },
+    ]),
+  ],
   controllers: [PortfolioController],
-  providers: [PortfolioService, PortfolioTool, Logger],
-  exports: [PortfolioService, PortfolioTool],
+  providers: [PortfolioService, CatalogService, PortfolioTool, Logger],
+  exports: [PortfolioService, CatalogService, PortfolioTool],
 })
 export class PortfolioModule {}

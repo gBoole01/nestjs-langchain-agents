@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -10,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
+import { PortfolioService } from 'src/tools/portfolio/portfolio.service';
 import { ArchivistAgentService } from './crew/archivist-agent.service';
 import { PortfolioAnalystAgentService } from './crew/portfolio-analyst.service';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
@@ -25,11 +27,17 @@ export class StockAnalysisAgentController {
     private readonly archivistAgentService: ArchivistAgentService,
     private readonly portfolioAnalystAgentService: PortfolioAnalystAgentService,
     private readonly analysisRunsService: AnalysisRunsService,
+    private readonly portfolioService: PortfolioService,
   ) {}
 
   @Post('runs')
   @HttpCode(202)
-  run(@Body() dto: RunStockAnalysisDto): RunRecord {
+  async run(@Body() dto: RunStockAnalysisDto): Promise<RunRecord> {
+    if (!(await this.portfolioService.isTracked(dto.ticker))) {
+      throw new BadRequestException(
+        `Ticker ${dto.ticker} is not in the portfolio or watchlist`,
+      );
+    }
     return this.analysisRunsService.start('stock-analysis', dto, () =>
       this.stockAnalysisAgentGraphService.runAgent(dto.ticker),
     );
@@ -37,7 +45,16 @@ export class StockAnalysisAgentController {
 
   @Post('runs/batch')
   @HttpCode(202)
-  runBatch(@Body() dto: RunStockAnalysisBatchDto): RunRecord[] {
+  async runBatch(@Body() dto: RunStockAnalysisBatchDto): Promise<RunRecord[]> {
+    const trackedFlags = await Promise.all(
+      dto.tickers.map((ticker) => this.portfolioService.isTracked(ticker)),
+    );
+    const untracked = dto.tickers.filter((_, index) => !trackedFlags[index]);
+    if (untracked.length > 0) {
+      throw new BadRequestException(
+        `Tickers not in the portfolio or watchlist: ${untracked.join(', ')}`,
+      );
+    }
     return dto.tickers.map((ticker) =>
       this.analysisRunsService.start('stock-analysis', { ticker }, () =>
         this.stockAnalysisAgentGraphService.runAgent(ticker),

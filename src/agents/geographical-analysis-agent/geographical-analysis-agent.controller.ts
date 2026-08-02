@@ -56,10 +56,7 @@ export class GeographicalAnalysisAgentController {
 
   @Get('reports/:id')
   async getReport(@Param('id') id: string): Promise<BroaderReportDocument> {
-    const report = await this.broaderReportsService.getById(
-      'geographical',
-      id,
-    );
+    const report = await this.broaderReportsService.getById('geographical', id);
     if (!report) {
       throw new NotFoundException(`Report ${id} not found`);
     }

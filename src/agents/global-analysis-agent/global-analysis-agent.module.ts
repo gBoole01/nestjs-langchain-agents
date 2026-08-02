@@ -11,7 +11,12 @@ import { GlobalAnalysisAgentController } from './global-analysis-agent.controlle
 import { GlobalAnalysisAgentService } from './global-analysis-agent.service';
 
 @Module({
-  imports: [ConfigModule, LangchainCoreModule, ToolsModule, BroaderAnalysisModule],
+  imports: [
+    ConfigModule,
+    LangchainCoreModule,
+    ToolsModule,
+    BroaderAnalysisModule,
+  ],
   controllers: [GlobalAnalysisAgentController],
   providers: [
     GlobalAnalysisAgentService,

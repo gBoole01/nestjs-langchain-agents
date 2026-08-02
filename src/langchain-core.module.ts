@@ -25,6 +25,7 @@ function createVectorStoreProvider(
     useFactory: async (configService: ConfigService) => {
       const embeddings = new GoogleGenerativeAIEmbeddings({
         apiKey: configService.get<string>('GEMINI_API_KEY'),
+        model: 'gemini-embedding-001',
       });
 
       if (process.env.NODE_ENV === 'production') {
@@ -39,9 +40,8 @@ function createVectorStoreProvider(
           collection,
         });
       } else {
-        const { Chroma } = await import(
-          '@langchain/community/vectorstores/chroma'
-        );
+        const { Chroma } =
+          await import('@langchain/community/vectorstores/chroma');
         const chromaClient = new ChromaClient({
           path: 'http://localhost:8000',
         });
@@ -74,6 +74,7 @@ function createVectorStoreProvider(
       useFactory: (configService: ConfigService) =>
         new GoogleGenerativeAIEmbeddings({
           apiKey: configService.get<string>('GEMINI_API_KEY'),
+          model: 'gemini-embedding-001',
         }),
       inject: [ConfigService],
     },
@@ -82,6 +83,7 @@ function createVectorStoreProvider(
       useFactory: (configService: ConfigService) =>
         new GoogleGenerativeAIEmbeddings({
           apiKey: configService.get<string>('GEMINI_API_KEY'),
+          model: 'gemini-embedding-001',
         }),
       inject: [ConfigService],
     },

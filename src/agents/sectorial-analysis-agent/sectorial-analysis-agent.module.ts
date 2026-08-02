@@ -11,7 +11,12 @@ import { SectorialAnalysisAgentController } from './sectorial-analysis-agent.con
 import { SectorialAnalysisAgentService } from './sectorial-analysis-agent.service';
 
 @Module({
-  imports: [ConfigModule, LangchainCoreModule, ToolsModule, BroaderAnalysisModule],
+  imports: [
+    ConfigModule,
+    LangchainCoreModule,
+    ToolsModule,
+    BroaderAnalysisModule,
+  ],
   controllers: [SectorialAnalysisAgentController],
   providers: [
     SectorialAnalysisAgentService,

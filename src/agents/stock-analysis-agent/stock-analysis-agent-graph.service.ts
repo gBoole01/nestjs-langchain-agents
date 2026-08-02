@@ -120,7 +120,7 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
   }
 
   runParallelAnalysis = async (state) => {
-    const { region, sector } = this.portfolioService.findRegionAndSector(
+    const { region, sector } = await this.portfolioService.findRegionAndSector(
       state.ticker,
     );
 

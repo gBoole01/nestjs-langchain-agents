@@ -21,7 +21,7 @@ export class ReportRetrievalService {
     this.isProduction = this.configService.get('NODE_ENV') === 'production';
     this.embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: this.configService.get<string>('GEMINI_API_KEY'),
-      model: 'embedding-001',
+      model: 'gemini-embedding-001',
     });
 
     if (!this.isProduction) {

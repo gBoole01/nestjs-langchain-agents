@@ -5,7 +5,10 @@ import {
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 import {
   AgentResult,
   DataAnalysisResult,
@@ -74,8 +77,8 @@ export class WriterAgentService implements OnModuleInit {
           You will be provided with technical data, news analysis, a previous report, and broader global/regional/sector context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
           `,
         ],
-        new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
       ]);
 
       const agent = createToolCallingAgent({

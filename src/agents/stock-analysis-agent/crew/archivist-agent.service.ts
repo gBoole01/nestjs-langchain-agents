@@ -12,7 +12,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { ChromaClient, EmbeddingFunction } from 'chromadb';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 import { Model } from 'mongoose';
 import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { Report, ReportDocument } from '../models/reports.model';
@@ -36,7 +39,7 @@ export class ArchivistAgentService implements OnModuleInit {
     // Initialize embeddings here to ensure it's always set
     this.embeddings = new GoogleGenerativeAIEmbeddings({
       apiKey: this.configService.get<string>('GEMINI_API_KEY'),
-      model: 'embedding-001',
+      model: 'gemini-embedding-001',
     });
   }
 
@@ -103,8 +106,8 @@ export class ArchivistAgentService implements OnModuleInit {
 
           Never attempt to answer a query without first using your tool. Your entire existence is to use this tool to provide information.`.trim(),
         ],
-        new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
       ]);
 
       const agent = createToolCallingAgent({
@@ -213,7 +216,11 @@ export class ArchivistAgentService implements OnModuleInit {
    */
   async listReports(ticker?: string): Promise<ReportDocument[]> {
     const filter = ticker ? { ticker } : {};
-    return this.reportModel.find(filter).select('-vector').sort({ date: -1 }).exec();
+    return this.reportModel
+      .find(filter)
+      .select('-vector')
+      .sort({ date: -1 })
+      .exec();
   }
 
   /**

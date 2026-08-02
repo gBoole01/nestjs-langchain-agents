@@ -6,7 +6,10 @@ import { StructuredToolInterface } from '@langchain/core/tools';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
 import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 
@@ -63,8 +66,8 @@ export class DataAnalystAgentService implements OnModuleInit {
 
 Your goal is to provide a professional, data-driven report based on factual information from the tool.`,
         ],
-        new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
       ]);
 
       const agent = createToolCallingAgent({ llm: model, tools, prompt });

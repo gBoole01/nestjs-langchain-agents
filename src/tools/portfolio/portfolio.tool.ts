@@ -18,7 +18,7 @@ export class PortfolioTool {
       async () => {
         try {
           console.log('PortfolioTool called to retrieve portfolio.');
-          const portfolio = this.portfolioService.findAll();
+          const portfolio = await this.portfolioService.findAll();
           return JSON.stringify(portfolio, null, 2);
         } catch (error) {
           return JSON.stringify({

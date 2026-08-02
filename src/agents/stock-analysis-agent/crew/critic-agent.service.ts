@@ -5,7 +5,10 @@ import {
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 
 export interface CritiqueReportInput {
   report: string;
@@ -58,8 +61,8 @@ export class CriticAgentService implements OnModuleInit {
 
           You must be strict and objective. Do not pass a report that contains inconsistencies or is poorly formatted.`,
         ],
-        new MessagesPlaceholder('agent_scratchpad'),
         ['human', '{input}'],
+        new MessagesPlaceholder('agent_scratchpad'),
       ]);
 
       const agent = createToolCallingAgent({

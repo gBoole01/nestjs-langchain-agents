@@ -11,7 +11,12 @@ import { GeographicalAnalysisAgentController } from './geographical-analysis-age
 import { GeographicalAnalysisAgentService } from './geographical-analysis-agent.service';
 
 @Module({
-  imports: [ConfigModule, LangchainCoreModule, ToolsModule, BroaderAnalysisModule],
+  imports: [
+    ConfigModule,
+    LangchainCoreModule,
+    ToolsModule,
+    BroaderAnalysisModule,
+  ],
   controllers: [GeographicalAnalysisAgentController],
   providers: [
     GeographicalAnalysisAgentService,

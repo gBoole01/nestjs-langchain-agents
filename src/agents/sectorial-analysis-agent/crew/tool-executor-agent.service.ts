@@ -6,7 +6,10 @@ import { StructuredToolInterface } from '@langchain/core/tools';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
+import {
+  AgentExecutor,
+  createToolCallingAgent,
+} from '@langchain/classic/agents';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { WebScrapingTool } from 'src/tools/web-scraping/web-scraping.tool';
 

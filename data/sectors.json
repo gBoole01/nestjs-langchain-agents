@@ -1,71 +1,157 @@
 [
-  { "sector": "Information Technology", "group": "Information Technology" },
-  { "sector": "Software", "group": "Information Technology" },
-  { "sector": "Semiconductors", "group": "Information Technology" },
-  { "sector": "Hardware", "group": "Information Technology" },
-  { "sector": "Cloud Infrastructure", "group": "Information Technology" },
-
-  { "sector": "Financials", "group": "Financials" },
-  { "sector": "Banks", "group": "Financials" },
-  { "sector": "Diversified Financials", "group": "Financials" },
-  { "sector": "Insurance", "group": "Financials" },
-  { "sector": "Fintech", "group": "Financials" },
-
-  { "sector": "Healthcare", "group": "Healthcare" },
-  { "sector": "Pharmaceuticals", "group": "Healthcare" },
-  { "sector": "Biotechnology", "group": "Healthcare" },
-  { "sector": "Medical Devices", "group": "Healthcare" },
-
-  { "sector": "Consumer Discretionary", "group": "Consumer Discretionary" },
-  { "sector": "Automobiles", "group": "Consumer Discretionary" },
-  { "sector": "Luxury Goods", "group": "Consumer Discretionary" },
-  { "sector": "Retail", "group": "Consumer Discretionary" },
-  { "sector": "Hotels/Restaurants", "group": "Consumer Discretionary" },
-
-  { "sector": "Consumer Staples", "group": "Consumer Staples" },
-  { "sector": "Food", "group": "Consumer Staples" },
-  { "sector": "Beverage", "group": "Consumer Staples" },
-  { "sector": "Tobacco", "group": "Consumer Staples" },
-  { "sector": "Household & Personal Products", "group": "Consumer Staples" },
-
-  { "sector": "Communication Services", "group": "Communication Services" },
-  { "sector": "Interactive Media", "group": "Communication Services" },
-  { "sector": "Telecommunication Services", "group": "Communication Services" },
-  { "sector": "Entertainment", "group": "Communication Services" },
-
-  { "sector": "Industrials", "group": "Industrials" },
-  { "sector": "Aerospace & Defense", "group": "Industrials" },
-  { "sector": "Machinery", "group": "Industrials" },
-  { "sector": "Transportation", "group": "Industrials" },
-  { "sector": "Logistics", "group": "Industrials" },
-
-  { "sector": "Energy", "group": "Energy" },
-  { "sector": "Oil", "group": "Energy" },
-  { "sector": "Gas", "group": "Energy" },
-  { "sector": "Consumable Fuels", "group": "Energy" },
-  { "sector": "Renewable Energy", "group": "Energy" },
-
-  { "sector": "Materials", "group": "Materials" },
-  { "sector": "Chemicals", "group": "Materials" },
-  { "sector": "Construction Materials", "group": "Materials" },
-  { "sector": "Metals & Mining", "group": "Materials" },
-
-  { "sector": "Utilities", "group": "Utilities" },
-  { "sector": "Electric Utilities", "group": "Utilities" },
-  { "sector": "Gas Utilities", "group": "Utilities" },
-  { "sector": "Water Utilities", "group": "Utilities" },
-
-  { "sector": "Real Estate", "group": "Real Estate" },
-  { "sector": "Equity REITs", "group": "Real Estate" },
-  { "sector": "Real Estate Management & Development", "group": "Real Estate" },
-
-  { "sector": "Commodities", "group": "Commodities" },
-  { "sector": "Hard Assets", "group": "Commodities" },
-  { "sector": "Energy Futures", "group": "Commodities" },
-  { "sector": "Precious & Industrial Metals", "group": "Commodities" },
-
-  { "sector": "Cryptocurrencies", "group": "Cryptocurrencies" },
-  { "sector": "Layer-1 Protocols", "group": "Cryptocurrencies" },
-  { "sector": "Decentralized Finance", "group": "Cryptocurrencies" },
-  { "sector": "Digital Tokens", "group": "Cryptocurrencies" }
+  {
+    "group": "Information Technology",
+    "frequency": "month",
+    "backfillYears": 3,
+    "sectors": [
+      "Information Technology",
+      "Semiconductors",
+      "Hardware"
+    ]
+  },
+  {
+    "group": "Software / SaaS",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Software",
+      "Cloud Infrastructure"
+    ]
+  },
+  {
+    "group": "Financials",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Financials",
+      "Banks",
+      "Diversified Financials",
+      "Insurance",
+      "Fintech"
+    ]
+  },
+  {
+    "group": "Healthcare",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Healthcare",
+      "Pharmaceuticals",
+      "Biotechnology",
+      "Medical Devices"
+    ]
+  },
+  {
+    "group": "Consumer Discretionary",
+    "frequency": "month",
+    "backfillYears": 3,
+    "sectors": [
+      "Consumer Discretionary",
+      "Automobiles",
+      "Luxury Goods",
+      "Retail",
+      "Hotels/Restaurants"
+    ]
+  },
+  {
+    "group": "Consumer Staples",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Consumer Staples",
+      "Food",
+      "Beverage",
+      "Tobacco",
+      "Household & Personal Products"
+    ]
+  },
+  {
+    "group": "Communication Services",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Communication Services",
+      "Interactive Media",
+      "Telecommunication Services",
+      "Entertainment"
+    ]
+  },
+  {
+    "group": "Industrials",
+    "frequency": "month",
+    "backfillYears": 5,
+    "sectors": [
+      "Industrials",
+      "Aerospace & Defense",
+      "Machinery",
+      "Transportation",
+      "Logistics"
+    ]
+  },
+  {
+    "group": "Energy",
+    "frequency": "month",
+    "backfillYears": 5,
+    "sectors": [
+      "Energy",
+      "Oil",
+      "Gas",
+      "Consumable Fuels",
+      "Renewable Energy"
+    ]
+  },
+  {
+    "group": "Materials",
+    "frequency": "month",
+    "backfillYears": 5,
+    "sectors": [
+      "Materials",
+      "Chemicals",
+      "Construction Materials",
+      "Metals & Mining"
+    ]
+  },
+  {
+    "group": "Utilities",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Utilities",
+      "Electric Utilities",
+      "Gas Utilities",
+      "Water Utilities"
+    ]
+  },
+  {
+    "group": "Real Estate",
+    "frequency": "quarter",
+    "backfillYears": 5,
+    "sectors": [
+      "Real Estate",
+      "Equity REITs",
+      "Real Estate Management & Development"
+    ]
+  },
+  {
+    "group": "Commodities",
+    "frequency": "month",
+    "backfillYears": 5,
+    "sectors": [
+      "Commodities",
+      "Hard Assets",
+      "Energy Futures",
+      "Precious & Industrial Metals"
+    ]
+  },
+  {
+    "group": "Cryptocurrencies",
+    "frequency": "week",
+    "backfillYears": 3,
+    "sectors": [
+      "Cryptocurrencies",
+      "Layer-1 Protocols",
+      "Decentralized Finance",
+      "Digital Tokens"
+    ]
+  }
 ]

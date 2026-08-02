@@ -15,6 +15,7 @@ import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
 import { BackfillGeoDto } from './dto/backfill-geo.dto';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
+import { MissingPeriodsQueryDto } from './dto/missing-periods-query.dto';
 import { RunGeoAnalysisDto } from './dto/run-geo-analysis.dto';
 import { GeographicalAnalysisAgentService } from './geographical-analysis-agent.service';
 
@@ -61,7 +62,7 @@ export class GeographicalAnalysisAgentController {
     }
     return this.analysisRunsService.start('geo-analysis-backfill', dto, () =>
       this.geographicalAnalysisAgentService
-        .backfillAllRegions(dto.from, dto.to, dto.regions)
+        .backfillAllRegions(dto.from, dto.to, dto.regions, dto.periods)
         .then((summary) => JSON.stringify(summary)),
     );
   }
@@ -69,6 +70,13 @@ export class GeographicalAnalysisAgentController {
   @Get('regions')
   listRegions(): { region: string }[] {
     return this.geographicalAnalysisAgentService.listRegions();
+  }
+
+  @Get('missing-periods')
+  getMissingPeriods(@Query() query: MissingPeriodsQueryDto): Promise<string[]> {
+    return this.geographicalAnalysisAgentService.getMissingPeriods(
+      query.region,
+    );
   }
 
   @Get('reports')

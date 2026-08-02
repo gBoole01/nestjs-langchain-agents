@@ -1,7 +1,13 @@
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Annotation, END, StateGraph } from '@langchain/langgraph';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -12,19 +18,34 @@ import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
 import {
   addPeriods,
+  Cadence,
   enumeratePeriods,
   getCurrentPeriod,
+  getPeriodBounds,
   getPeriodLabel,
+  periodsPerYear,
 } from 'src/agents/broader-analysis/period.util';
 
-const FRESHNESS_WINDOW_MONTHS = 3;
-const BACKFILL_LOOKBACK_PERIODS = 8;
+interface SectorGroupConfig {
+  group: string;
+  frequency: Cadence;
+  backfillYears: number;
+  sectors: string[];
+}
+
+interface SectorInfo {
+  sector: string;
+  group: string;
+  frequency: Cadence;
+  backfillYears: number;
+}
 
 /**
  * This agent will run for each monitored activity sector.
  * Then it will store the results in a database.
  * He will also expose its results to other agents.
- * TIMEFRAME: re-run at most once every 3 months per sector (see hasFreshReport).
+ * TIMEFRAME: each sector group re-runs at most once per its own cadence
+ * (monthly/quarterly/weekly, see data/sectors.json and hasFreshReport).
  */
 @Injectable()
 export class SectorialAnalysisAgentService implements OnModuleInit {
@@ -141,8 +162,41 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * Lists every sector group monitored via data/sectors.json, along with its
+   * cadence (frequency) and backfill depth (backfillYears).
+   */
+  listSectorGroups(): SectorGroupConfig[] {
+    const filePath = join(__dirname, '..', '..', '..', 'data', 'sectors.json');
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  }
+
+  /**
+   * Flattens data/sectors.json into one entry per monitored sector, each
+   * carrying the cadence/backfill settings of its group.
+   */
+  listSectors(): SectorInfo[] {
+    return this.listSectorGroups().flatMap((group) =>
+      group.sectors.map((sector) => ({
+        sector,
+        group: group.group,
+        frequency: group.frequency,
+        backfillYears: group.backfillYears,
+      })),
+    );
+  }
+
+  private getSectorConfig(sector: string): SectorInfo {
+    const found = this.listSectors().find((s) => s.sector === sector);
+    if (!found) {
+      throw new NotFoundException(`Unknown sector: ${sector}`);
+    }
+    return found;
+  }
+
+  /**
    * True if the given sector already has a report (or a run in progress)
-   * within the last 3 months. Also true while a full "run all sectors"
+   * for its current reporting period (cadence depends on the sector's
+   * group, see data/sectors.json). Also true while a full "run all sectors"
    * sweep is in progress, since it may currently be processing this sector.
    */
   async hasFreshReport(sector: string): Promise<boolean> {
@@ -155,36 +209,32 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
     ) {
       return true;
     }
+    const { frequency } = this.getSectorConfig(sector);
+    const cutoff = getPeriodBounds(getCurrentPeriod(frequency)).start;
     return this.broaderReportsService.hasReportWithinWindow(
       'sectorial',
-      FRESHNESS_WINDOW_MONTHS,
+      cutoff,
       sector,
     );
   }
 
   /**
    * Runs the full sectorial analysis workflow (research -> critique loop ->
-   * synthesize -> archive) for a single monitored sector and quarter period
-   * (defaults to the current one).
+   * synthesize -> archive) for a single monitored sector and period
+   * (defaults to the current period for that sector's own cadence).
    */
-  async runAnalysis(
-    sector: string,
-    period: string = getCurrentPeriod('quarter'),
-  ): Promise<string> {
+  async runAnalysis(sector: string, period?: string): Promise<string> {
+    const resolvedPeriod =
+      period ?? getCurrentPeriod(this.getSectorConfig(sector).frequency);
     this.logger.log(
-      `Running sectorial analysis for sector: ${sector}, period: ${period}`,
+      `Running sectorial analysis for sector: ${sector}, period: ${resolvedPeriod}`,
     );
-    const result = await this.workflow.invoke({ sector, period });
+    const result = await this.workflow.invoke({
+      sector,
+      period: resolvedPeriod,
+    });
     this.logger.log('Sectorial analysis complete.');
     return result.finalReport || 'No report generated.';
-  }
-
-  /**
-   * Lists every sector monitored via data/sectors.json.
-   */
-  listSectors(): { sector: string }[] {
-    const filePath = join(__dirname, '..', '..', '..', 'data', 'sectors.json');
-    return JSON.parse(readFileSync(filePath, 'utf-8'));
   }
 
   /**
@@ -192,10 +242,10 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
    */
   async runAnalysisForAllSectors(): Promise<void> {
     const sectors = this.listSectors();
-    for (const { sector } of sectors) {
+    for (const { sector, frequency } of sectors) {
       if (await this.hasFreshReport(sector)) {
         this.logger.log(
-          `Skipping ${sector}: analysis already fresh within the last ${FRESHNESS_WINDOW_MONTHS} months.`,
+          `Skipping ${sector}: analysis already fresh for the current ${frequency}.`,
         );
         continue;
       }
@@ -207,36 +257,93 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
    * Cheap, read-only retrieval of the most relevant archived reports for a
    * sector, without re-running the full research/critique/synthesis pipeline.
    * Used by other agents (e.g. the daily stock analysis graph) that need
-   * sector context but must not trigger the monthly research workflow.
+   * sector context but must not trigger the research workflow.
    */
   async getContext(sector: string): Promise<string> {
     return this.archivist.retrieveData(sector);
   }
 
   /**
-   * Generates the missing sectorial analysis reports for past quarters
-   * across the given (or all monitored) sectors, so stock analysis has
-   * historical sector context to draw on. Defaults to the 8 quarters
-   * (~2 years) before the current one, skipping any sector/period that
+   * Default backfill range for a sector, derived from its own cadence and
+   * backfillYears (see data/sectors.json).
+   */
+  private defaultBackfillRange(sector: string): { from: string; to: string } {
+    const { frequency, backfillYears } = this.getSectorConfig(sector);
+    const lookbackPeriods = backfillYears * periodsPerYear(frequency);
+    const to = addPeriods(getCurrentPeriod(frequency), -1);
+    const from = addPeriods(to, -(lookbackPeriods - 1));
+    return { from, to };
+  }
+
+  /**
+   * Lists the periods (in the sector's own cadence) within its default
+   * backfill window that don't have a report yet, so the frontend can offer
+   * them for selection instead of requiring the user to type period labels
+   * by hand.
+   */
+  async getMissingPeriods(sector: string): Promise<string[]> {
+    const { from, to } = this.defaultBackfillRange(sector);
+    const periods = enumeratePeriods(from, to);
+    const missing: string[] = [];
+    for (const period of periods) {
+      const exists = await this.broaderReportsService.hasReportForPeriod(
+        'sectorial',
+        sector,
+        period,
+      );
+      if (!exists) {
+        missing.push(period);
+      }
+    }
+    return missing;
+  }
+
+  /**
+   * Generates the missing sectorial analysis reports for past periods across
+   * the given (or all monitored) sectors, so stock analysis has historical
+   * sector context to draw on. Each sector's lookback depth and cadence
+   * (month/quarter/week) come from its group in data/sectors.json, so an
+   * explicit `from`/`to`/`periods` override is only accepted when every
+   * targeted sector shares the same cadence. Skips any sector/period that
    * already has a report.
    */
   async backfillAllSectors(
     from?: string,
     to?: string,
     sectors?: string[],
+    periods?: string[],
   ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
     const targetSectors = sectors?.length
       ? sectors
       : this.listSectors().map((s) => s.sector);
-    const resolvedTo = to ?? addPeriods(getCurrentPeriod('quarter'), -1);
-    const resolvedFrom =
-      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
-    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+
+    if (from || to || periods?.length) {
+      const cadences = new Set(
+        targetSectors.map((sector) => this.getSectorConfig(sector).frequency),
+      );
+      if (cadences.size > 1) {
+        throw new BadRequestException(
+          'Explicit from/to/periods backfill override requires all targeted sectors to share the same frequency (month/quarter/week)',
+        );
+      }
+    }
 
     const ranPeriods: string[] = [];
     const skippedPeriods: string[] = [];
     for (const sector of targetSectors) {
-      for (const period of periods) {
+      let sectorPeriods: string[];
+      if (periods?.length) {
+        sectorPeriods = periods;
+      } else {
+        const { frequency, backfillYears } = this.getSectorConfig(sector);
+        const lookbackPeriods = backfillYears * periodsPerYear(frequency);
+        const resolvedTo = to ?? addPeriods(getCurrentPeriod(frequency), -1);
+        const resolvedFrom =
+          from ?? addPeriods(resolvedTo, -(lookbackPeriods - 1));
+        sectorPeriods = enumeratePeriods(resolvedFrom, resolvedTo);
+      }
+
+      for (const period of sectorPeriods) {
         if (
           await this.broaderReportsService.hasReportForPeriod(
             'sectorial',

@@ -47,16 +47,14 @@ export class BroaderReportsService {
 
   /**
    * Checks whether a report for the given domain (and optional subject) was
-   * already saved within the last `months` months.
+   * already saved on or after `cutoff` (typically the start of the current
+   * reporting period for that domain/subject's cadence).
    */
   async hasReportWithinWindow(
     domain: BroaderReportDomain,
-    months: number,
+    cutoff: Date,
     subject?: string,
   ): Promise<boolean> {
-    const cutoff = new Date();
-    cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
-
     const filter: Record<string, any> = { domain, date: { $gte: cutoff } };
     if (subject) {
       filter.subject = subject;

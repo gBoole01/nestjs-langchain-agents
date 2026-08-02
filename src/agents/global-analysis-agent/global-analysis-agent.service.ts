@@ -12,12 +12,13 @@ import {
   addPeriods,
   enumeratePeriods,
   getCurrentPeriod,
+  getPeriodBounds,
   getPeriodLabel,
 } from 'src/agents/broader-analysis/period.util';
 
 const GLOBAL_ANALYSIS_SUBJECT = 'global economic outlook';
-const FRESHNESS_WINDOW_MONTHS = 6;
-const BACKFILL_LOOKBACK_PERIODS = 8;
+// 10 years of semesters (structural breaks like tightening cycles need a long lookback).
+const BACKFILL_LOOKBACK_PERIODS = 20;
 
 @Injectable()
 export class GlobalAnalysisAgentService implements OnModuleInit {
@@ -136,16 +137,14 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
   }
   /**
    * True if the global analysis has already run (or is currently running)
-   * within the last 6 months.
+   * for the current semester.
    */
   async hasFreshReport(): Promise<boolean> {
     if (this.analysisRunsService.hasPendingRun('global-analysis')) {
       return true;
     }
-    return this.broaderReportsService.hasReportWithinWindow(
-      'global',
-      FRESHNESS_WINDOW_MONTHS,
-    );
+    const cutoff = getPeriodBounds(getCurrentPeriod('semester')).start;
+    return this.broaderReportsService.hasReportWithinWindow('global', cutoff);
   }
 
   /**
@@ -153,7 +152,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
    * economic situation, for the given semester period (defaults to the
    * current one). Unlike the geographical/sectorial agents, there is only
    * one global subject to analyze.
-   * TIMEFRAME: re-run at most once every 6 months (see hasFreshReport).
+   * TIMEFRAME: re-run at most once per semester (see hasFreshReport).
    */
   async runAnalysis(
     period: string = getCurrentPeriod('semester'),
@@ -165,23 +164,62 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * Default semester range covered by a backfill/missing-periods check: the
+   * 20 semesters (10 years) before the current one.
+   */
+  private defaultBackfillRange(): { from: string; to: string } {
+    const to = addPeriods(getCurrentPeriod('semester'), -1);
+    const from = addPeriods(to, -(BACKFILL_LOOKBACK_PERIODS - 1));
+    return { from, to };
+  }
+
+  /**
+   * Lists the semesters within the default backfill window that don't have
+   * a global analysis report yet, so the frontend can offer them for
+   * selection instead of requiring the user to type period labels by hand.
+   */
+  async getMissingPeriods(): Promise<string[]> {
+    const { from, to } = this.defaultBackfillRange();
+    const periods = enumeratePeriods(from, to);
+    const missing: string[] = [];
+    for (const period of periods) {
+      const exists = await this.broaderReportsService.hasReportForPeriod(
+        'global',
+        GLOBAL_ANALYSIS_SUBJECT,
+        period,
+      );
+      if (!exists) {
+        missing.push(period);
+      }
+    }
+    return missing;
+  }
+
+  /**
    * Generates the missing global analysis reports for past semesters, so
-   * stock analysis has historical macro context to draw on. Defaults to the
-   * 8 semesters (~5 years) before the current one, skipping any period that
-   * already has a report.
+   * stock analysis has historical macro context to draw on. When `periods`
+   * is given, runs exactly those periods; otherwise defaults to the 20
+   * semesters (10 years) before the current one (or the given `from`/`to`
+   * range). Skips any period that already has a report.
    */
   async backfill(
     from?: string,
     to?: string,
+    periods?: string[],
   ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
-    const resolvedTo = to ?? addPeriods(getCurrentPeriod('semester'), -1);
-    const resolvedFrom =
-      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
-    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+    let targetPeriods: string[];
+    if (periods?.length) {
+      targetPeriods = periods;
+    } else {
+      const resolvedTo = to ?? addPeriods(getCurrentPeriod('semester'), -1);
+      const resolvedFrom =
+        from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
+      targetPeriods = enumeratePeriods(resolvedFrom, resolvedTo);
+    }
 
     const ranPeriods: string[] = [];
     const skippedPeriods: string[] = [];
-    for (const period of periods) {
+    for (const period of targetPeriods) {
       if (
         await this.broaderReportsService.hasReportForPeriod(
           'global',

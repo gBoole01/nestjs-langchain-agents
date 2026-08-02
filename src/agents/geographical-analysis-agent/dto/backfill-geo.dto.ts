@@ -19,4 +19,12 @@ export class BackfillGeoDto {
   @IsArray()
   @IsString({ each: true })
   regions?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @Matches(QUARTER_PATTERN, {
+    each: true,
+    message: 'each period must be a quarter label, e.g. "2024-Q3"',
+  })
+  periods?: string[];
 }

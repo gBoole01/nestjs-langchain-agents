@@ -11,10 +11,12 @@ import {
 } from '@nestjs/common';
 import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
 import { BroaderReportDocument } from 'src/agents/broader-analysis/models/broader-report.model';
+import { Cadence } from 'src/agents/broader-analysis/period.util';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
 import { BackfillSectorDto } from './dto/backfill-sector.dto';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
+import { MissingPeriodsQueryDto } from './dto/missing-periods-query.dto';
 import { RunSectorAnalysisDto } from './dto/run-sector-analysis.dto';
 import { SectorialAnalysisAgentService } from './sectorial-analysis-agent.service';
 
@@ -31,7 +33,7 @@ export class SectorialAnalysisAgentController {
   async run(@Body() dto: RunSectorAnalysisDto): Promise<RunRecord> {
     if (await this.sectorialAnalysisAgentService.hasFreshReport(dto.sector)) {
       throw new ConflictException(
-        `Sectorial analysis for ${dto.sector} has already run within the last 3 months`,
+        `Sectorial analysis for ${dto.sector} has already run for its current reporting period`,
       );
     }
     return this.analysisRunsService.start('sector-analysis', dto, () =>
@@ -59,14 +61,24 @@ export class SectorialAnalysisAgentController {
     }
     return this.analysisRunsService.start('sector-analysis-backfill', dto, () =>
       this.sectorialAnalysisAgentService
-        .backfillAllSectors(dto.from, dto.to, dto.sectors)
+        .backfillAllSectors(dto.from, dto.to, dto.sectors, dto.periods)
         .then((summary) => JSON.stringify(summary)),
     );
   }
 
   @Get('sectors')
-  listSectors(): { sector: string }[] {
+  listSectors(): {
+    sector: string;
+    group: string;
+    frequency: Cadence;
+    backfillYears: number;
+  }[] {
     return this.sectorialAnalysisAgentService.listSectors();
+  }
+
+  @Get('missing-periods')
+  getMissingPeriods(@Query() query: MissingPeriodsQueryDto): Promise<string[]> {
+    return this.sectorialAnalysisAgentService.getMissingPeriods(query.sector);
   }
 
   @Get('reports')

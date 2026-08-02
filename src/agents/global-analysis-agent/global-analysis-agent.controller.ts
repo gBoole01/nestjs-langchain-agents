@@ -48,9 +48,14 @@ export class GlobalAnalysisAgentController {
     }
     return this.analysisRunsService.start('global-analysis-backfill', dto, () =>
       this.globalAnalysisAgentService
-        .backfill(dto.from, dto.to)
+        .backfill(dto.from, dto.to, dto.periods)
         .then((summary) => JSON.stringify(summary)),
     );
+  }
+
+  @Get('missing-periods')
+  getMissingPeriods(): Promise<string[]> {
+    return this.globalAnalysisAgentService.getMissingPeriods();
   }
 
   @Get('reports')

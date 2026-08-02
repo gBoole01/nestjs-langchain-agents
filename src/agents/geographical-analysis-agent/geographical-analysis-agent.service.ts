@@ -14,11 +14,12 @@ import {
   addPeriods,
   enumeratePeriods,
   getCurrentPeriod,
+  getPeriodBounds,
   getPeriodLabel,
 } from 'src/agents/broader-analysis/period.util';
 
-const FRESHNESS_WINDOW_MONTHS = 3;
-const BACKFILL_LOOKBACK_PERIODS = 8;
+// 5 years of quarters, aligned with standard economic cycle analysis.
+const BACKFILL_LOOKBACK_PERIODS = 20;
 
 /**
  * This agent will run for each monitored geographical area.
@@ -142,7 +143,7 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
 
   /**
    * True if the given region already has a report (or a run in progress)
-   * within the last 3 months. Also true while a full "run all regions"
+   * for the current quarter. Also true while a full "run all regions"
    * sweep is in progress, since it may currently be processing this region.
    */
   async hasFreshReport(region: string): Promise<boolean> {
@@ -155,9 +156,10 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
     ) {
       return true;
     }
+    const cutoff = getPeriodBounds(getCurrentPeriod('quarter')).start;
     return this.broaderReportsService.hasReportWithinWindow(
       'geographical',
-      FRESHNESS_WINDOW_MONTHS,
+      cutoff,
       region,
     );
   }
@@ -202,7 +204,7 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
     for (const { region } of geographies) {
       if (await this.hasFreshReport(region)) {
         this.logger.log(
-          `Skipping ${region}: analysis already fresh within the last ${FRESHNESS_WINDOW_MONTHS} months.`,
+          `Skipping ${region}: analysis already fresh for the current quarter.`,
         );
         continue;
       }
@@ -221,29 +223,69 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * Default quarter range covered by a backfill/missing-periods check: the
+   * 20 quarters (5 years) before the current one.
+   */
+  private defaultBackfillRange(): { from: string; to: string } {
+    const to = addPeriods(getCurrentPeriod('quarter'), -1);
+    const from = addPeriods(to, -(BACKFILL_LOOKBACK_PERIODS - 1));
+    return { from, to };
+  }
+
+  /**
+   * Lists the quarters within the default backfill window that don't have a
+   * report yet for the given region, so the frontend can offer them for
+   * selection instead of requiring the user to type period labels by hand.
+   */
+  async getMissingPeriods(region: string): Promise<string[]> {
+    const { from, to } = this.defaultBackfillRange();
+    const periods = enumeratePeriods(from, to);
+    const missing: string[] = [];
+    for (const period of periods) {
+      const exists = await this.broaderReportsService.hasReportForPeriod(
+        'geographical',
+        region,
+        period,
+      );
+      if (!exists) {
+        missing.push(period);
+      }
+    }
+    return missing;
+  }
+
+  /**
    * Generates the missing geographical analysis reports for past quarters
    * across the given (or all monitored) regions, so stock analysis has
-   * historical regional context to draw on. Defaults to the 8 quarters
-   * (~2 years) before the current one, skipping any region/period that
-   * already has a report.
+   * historical regional context to draw on. When `periods` is given, runs
+   * exactly those periods for each targeted region; otherwise defaults to
+   * the 20 quarters (5 years) before the current one (or the given
+   * `from`/`to` range). Skips any region/period that already has a report.
    */
   async backfillAllRegions(
     from?: string,
     to?: string,
     regions?: string[],
+    periods?: string[],
   ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
     const targetRegions = regions?.length
       ? regions
       : this.listRegions().map((r) => r.region);
-    const resolvedTo = to ?? addPeriods(getCurrentPeriod('quarter'), -1);
-    const resolvedFrom =
-      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
-    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+
+    let targetPeriods: string[];
+    if (periods?.length) {
+      targetPeriods = periods;
+    } else {
+      const resolvedTo = to ?? addPeriods(getCurrentPeriod('quarter'), -1);
+      const resolvedFrom =
+        from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
+      targetPeriods = enumeratePeriods(resolvedFrom, resolvedTo);
+    }
 
     const ranPeriods: string[] = [];
     const skippedPeriods: string[] = [];
     for (const region of targetRegions) {
-      for (const period of periods) {
+      for (const period of targetPeriods) {
         if (
           await this.broaderReportsService.hasReportForPeriod(
             'geographical',

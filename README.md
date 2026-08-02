@@ -41,15 +41,15 @@ npm run start:dev
 - [x] Add enhanced memory
 - [x] Add archivist agent to stock analysis
 - [x] Run stock analysis once per day per portfolio/watchlist item
-- [x] For other analysis (e.g., global, regional, sector), limit them to one per semester for global and one per quarter for regional/sectorial
+- [x] For other analysis (e.g., global, regional, sector), limit them to one per semester for global, one per quarter for regional, and one per group-specific cadence (monthly/quarterly/weekly) for sectorial
 - [X] Backfill other analysis past reports
 - [x] Scrape and store tiingo data every day and have agents use it instead of calling the API
 - [x] Add charts on frontend (sector repartition, item history)
 - [x] Add portfolio analysis on portfolio page
-- [ ] Add related latest reports on portfolio detail page
+- [x] Add related latest reports on portfolio detail page
 - [x] Add administration page to manage the catalog
 - [ ] Add order management to provide a better tracking of portfolio evolutions
-- [ ] Adjusts the backfill/reports period to be more specific
+- [x] Adjusts the backfill/reports period to be more specific
 - [ ] On stock analysis, return a structured response to enhance the vector chunking and allow split displays on the frontend with the following fields:
   - Report
   - Overall Sentiment (Positive, Negative, Neutral)

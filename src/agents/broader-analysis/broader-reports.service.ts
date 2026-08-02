@@ -6,6 +6,7 @@ import {
   BroaderReportDocument,
   BroaderReportDomain,
 } from './models/broader-report.model';
+import { getPeriodBounds } from './period.util';
 
 @Injectable()
 export class BroaderReportsService {
@@ -18,12 +19,14 @@ export class BroaderReportsService {
     domain: BroaderReportDomain,
     subject: string,
     reportContent: string,
+    period: string,
   ): Promise<void> {
     await this.broaderReportModel.create({
       domain,
       subject,
       reportContent,
-      date: new Date(),
+      period,
+      date: getPeriodBounds(period).end,
     });
   }
 
@@ -60,5 +63,20 @@ export class BroaderReportsService {
     }
 
     return Boolean(await this.broaderReportModel.exists(filter));
+  }
+
+  /**
+   * Checks whether a report already exists for this exact domain/subject/
+   * period combination, independent of the now-relative freshness window.
+   * Used by backfill to skip periods that have already been generated.
+   */
+  async hasReportForPeriod(
+    domain: BroaderReportDomain,
+    subject: string,
+    period: string,
+  ): Promise<boolean> {
+    return Boolean(
+      await this.broaderReportModel.exists({ domain, subject, period }),
+    );
   }
 }

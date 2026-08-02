@@ -13,6 +13,7 @@ import { BroaderReportsService } from 'src/agents/broader-analysis/broader-repor
 import { BroaderReportDocument } from 'src/agents/broader-analysis/models/broader-report.model';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
+import { BackfillGeoDto } from './dto/backfill-geo.dto';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
 import { RunGeoAnalysisDto } from './dto/run-geo-analysis.dto';
 import { GeographicalAnalysisAgentService } from './geographical-analysis-agent.service';
@@ -45,6 +46,23 @@ export class GeographicalAnalysisAgentController {
       this.geographicalAnalysisAgentService
         .runAnalysisForAllRegions()
         .then(() => 'All regions analyzed.'),
+    );
+  }
+
+  @Post('backfill')
+  @HttpCode(202)
+  backfill(@Body() dto: BackfillGeoDto): RunRecord {
+    if (
+      this.analysisRunsService.hasPendingRun('geo-analysis-backfill')
+    ) {
+      throw new ConflictException(
+        'A geographical analysis backfill is already in progress',
+      );
+    }
+    return this.analysisRunsService.start('geo-analysis-backfill', dto, () =>
+      this.geographicalAnalysisAgentService
+        .backfillAllRegions(dto.from, dto.to, dto.regions)
+        .then((summary) => JSON.stringify(summary)),
     );
   }
 

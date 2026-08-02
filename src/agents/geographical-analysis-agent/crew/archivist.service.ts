@@ -16,22 +16,35 @@ export class ArchivistService {
     private readonly broaderReportsService: BroaderReportsService,
   ) {}
 
-  async storeRawData(region: string, rawData: string): Promise<void> {
+  async storeRawData(
+    region: string,
+    rawData: string,
+    period: string,
+  ): Promise<void> {
     this.logger.log(`Archiving raw data for region "${region}"...`);
     const documents = [
-      new Document({ pageContent: rawData, metadata: { region } }),
+      new Document({ pageContent: rawData, metadata: { region, period } }),
     ];
     await this.vectorStore.addDocuments(documents);
     this.logger.log('Raw data archiving complete.');
   }
 
-  async storeFinalReport(region: string, finalReport: string): Promise<void> {
+  async storeFinalReport(
+    region: string,
+    finalReport: string,
+    period: string,
+  ): Promise<void> {
     this.logger.log(`Archiving final report for region "${region}"...`);
     const documents = [
-      new Document({ pageContent: finalReport, metadata: { region } }),
+      new Document({ pageContent: finalReport, metadata: { region, period } }),
     ];
     await this.vectorStore.addDocuments(documents);
-    await this.broaderReportsService.save('geographical', region, finalReport);
+    await this.broaderReportsService.save(
+      'geographical',
+      region,
+      finalReport,
+      period,
+    );
     this.logger.log('Final report successfully archived.');
   }
 

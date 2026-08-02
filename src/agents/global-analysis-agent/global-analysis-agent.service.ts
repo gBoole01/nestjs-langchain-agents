@@ -8,9 +8,16 @@ import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.ut
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
+import {
+  addPeriods,
+  enumeratePeriods,
+  getCurrentPeriod,
+  getPeriodLabel,
+} from 'src/agents/broader-analysis/period.util';
 
 const GLOBAL_ANALYSIS_SUBJECT = 'global economic outlook';
 const FRESHNESS_WINDOW_MONTHS = 6;
+const BACKFILL_LOOKBACK_PERIODS = 8;
 
 @Injectable()
 export class GlobalAnalysisAgentService implements OnModuleInit {
@@ -49,6 +56,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
   private initializeWorkflow() {
     // Define the state schema using Annotation.Root
     const GlobalAnalysisState = Annotation.Root({
+      period: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
       finalReport: Annotation<string>(),
@@ -57,10 +65,12 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
     // The entire workflow is built in a single, chained sequence
     this.workflow = new StateGraph(GlobalAnalysisState)
       // Node 1: Call the Research Team to fetch new data
-      .addNode('fetch_new_data', async () => {
-        this.logger.log('Step 1: Calling Research Team for fresh data...');
+      .addNode('fetch_new_data', async (state) => {
+        this.logger.log(
+          `Step 1: Calling Research Team for data on ${state.period}...`,
+        );
         const rawData = await this.researchTeam.runQuery(
-          GLOBAL_ANALYSIS_SUBJECT,
+          `${GLOBAL_ANALYSIS_SUBJECT} for ${getPeriodLabel(state.period)}`,
         );
         return { rawData: rawData };
       })
@@ -70,7 +80,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
         this.logger.log(
           'Step 2: Storing new data and retrieving historical context...',
         );
-        await this.archivist.storeRawData(state.rawData);
+        await this.archivist.storeRawData(state.rawData, state.period);
         const historicalContext = await this.archivist.retrieveData(
           GLOBAL_ANALYSIS_SUBJECT,
         );
@@ -83,18 +93,20 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
         const prompt = ChatPromptTemplate.fromMessages([
           [
             'system',
-            `You are a highly skilled macroeconomic analyst. Your task is to write a comprehensive global economic report.
+            `You are a highly skilled macroeconomic analyst. Your task is to write a comprehensive global economic report for the period {period_label}.
              Use the following new data and historical context to inform your analysis.
+             If this period is not the current one, frame the report as a retrospective analysis of that period rather than a forward-looking outlook.
              New Data: {raw_data}
              Historical Context: {historical_context}`,
           ],
           [
             'human',
-            'Please write a well-structured and insightful global economic outlook report.',
+            'Please write a well-structured and insightful global economic outlook report for {period_label}.',
           ],
         ]);
         const chain = prompt.pipe(this.model);
         const finalReport = await chain.invoke({
+          period_label: getPeriodLabel(state.period),
           raw_data: state.rawData,
           historical_context: state.historicalContext,
         });
@@ -107,6 +119,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
         await this.archivist.storeFinalReport(
           GLOBAL_ANALYSIS_SUBJECT,
           state.finalReport,
+          state.period,
         );
         return {};
       })
@@ -137,15 +150,53 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
 
   /**
    * Runs the entire global analysis workflow against the broad world
-   * economic situation. Takes no input — unlike the geographical/sectorial
-   * agents, there is only one global subject to analyze.
+   * economic situation, for the given semester period (defaults to the
+   * current one). Unlike the geographical/sectorial agents, there is only
+   * one global subject to analyze.
    * TIMEFRAME: re-run at most once every 6 months (see hasFreshReport).
    */
-  async runAnalysis(): Promise<string> {
-    this.logger.log('Running global analysis...');
-    const result = await this.workflow.invoke({});
+  async runAnalysis(
+    period: string = getCurrentPeriod('semester'),
+  ): Promise<string> {
+    this.logger.log(`Running global analysis for ${period}...`);
+    const result = await this.workflow.invoke({ period });
     this.logger.log('Global analysis complete.');
     return result.finalReport || 'No report generated.';
+  }
+
+  /**
+   * Generates the missing global analysis reports for past semesters, so
+   * stock analysis has historical macro context to draw on. Defaults to the
+   * 8 semesters (~5 years) before the current one, skipping any period that
+   * already has a report.
+   */
+  async backfill(
+    from?: string,
+    to?: string,
+  ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
+    const resolvedTo = to ?? addPeriods(getCurrentPeriod('semester'), -1);
+    const resolvedFrom =
+      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
+    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+
+    const ranPeriods: string[] = [];
+    const skippedPeriods: string[] = [];
+    for (const period of periods) {
+      if (
+        await this.broaderReportsService.hasReportForPeriod(
+          'global',
+          GLOBAL_ANALYSIS_SUBJECT,
+          period,
+        )
+      ) {
+        this.logger.log(`Skipping ${period}: report already exists.`);
+        skippedPeriods.push(period);
+        continue;
+      }
+      await this.runAnalysis(period);
+      ranPeriods.push(period);
+    }
+    return { ranPeriods, skippedPeriods };
   }
 
   /**

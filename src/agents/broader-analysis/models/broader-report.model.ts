@@ -18,6 +18,10 @@ export class BroaderReport {
 
   @Prop({ required: true })
   date: Date;
+
+  @Prop({ required: true })
+  period: string;
 }
 
 export const BroaderReportSchema = SchemaFactory.createForClass(BroaderReport);
+BroaderReportSchema.index({ domain: 1, subject: 1, period: 1 });

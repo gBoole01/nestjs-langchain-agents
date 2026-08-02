@@ -10,8 +10,15 @@ import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.ut
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
+import {
+  addPeriods,
+  enumeratePeriods,
+  getCurrentPeriod,
+  getPeriodLabel,
+} from 'src/agents/broader-analysis/period.util';
 
 const FRESHNESS_WINDOW_MONTHS = 3;
+const BACKFILL_LOOKBACK_PERIODS = 8;
 
 /**
  * This agent will run for each monitored geographical area.
@@ -56,6 +63,7 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
   private initializeWorkflow() {
     const GeographicalAnalysisState = Annotation.Root({
       region: Annotation<string>(),
+      period: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
       finalReport: Annotation<string>(),
@@ -64,10 +72,10 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
     this.workflow = new StateGraph(GeographicalAnalysisState)
       .addNode('fetch_new_data', async (state) => {
         this.logger.log(
-          `Step 1: Calling Research Team for fresh data on "${state.region}"...`,
+          `Step 1: Calling Research Team for data on "${state.region}" for ${state.period}...`,
         );
         const rawData = await this.researchTeam.runQuery(
-          `Latest economic outlook, growth, inflation, trade and geopolitical risk for region: ${state.region}`,
+          `Economic outlook, growth, inflation, trade and geopolitical risk for region: ${state.region}, for ${getPeriodLabel(state.period)}`,
         );
         return { rawData: rawData };
       })
@@ -76,7 +84,11 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
         this.logger.log(
           'Step 2: Storing new data and retrieving historical context...',
         );
-        await this.archivist.storeRawData(state.region, state.rawData);
+        await this.archivist.storeRawData(
+          state.region,
+          state.rawData,
+          state.period,
+        );
         const historicalContext = await this.archivist.retrieveData(
           state.region,
         );
@@ -88,19 +100,21 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
         const prompt = ChatPromptTemplate.fromMessages([
           [
             'system',
-            `You are a highly skilled regional economist. Your task is to write a comprehensive economic outlook report for the region: {region}.
+            `You are a highly skilled regional economist. Your task is to write a comprehensive economic outlook report for the region: {region}, for the period {period_label}.
              Use the following new data and historical context to inform your analysis.
+             If this period is not the current one, frame the report as a retrospective analysis of that period rather than a forward-looking outlook.
              New Data: {raw_data}
              Historical Context: {historical_context}`,
           ],
           [
             'human',
-            'Please write a well-structured and insightful economic outlook report for {region}.',
+            'Please write a well-structured and insightful economic outlook report for {region} for {period_label}.',
           ],
         ]);
         const chain = prompt.pipe(this.model);
         const finalReport = await chain.invoke({
           region: state.region,
+          period_label: getPeriodLabel(state.period),
           raw_data: state.rawData,
           historical_context: state.historicalContext,
         });
@@ -109,7 +123,11 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
 
       .addNode('archive_final_report', async (state) => {
         this.logger.log('Step 4: Archiving the final report...');
-        await this.archivist.storeFinalReport(state.region, state.finalReport);
+        await this.archivist.storeFinalReport(
+          state.region,
+          state.finalReport,
+          state.period,
+        );
         return {};
       })
 
@@ -146,11 +164,17 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
 
   /**
    * Runs the full geographical analysis workflow (research -> critique loop ->
-   * synthesize -> archive) for a single monitored region.
+   * synthesize -> archive) for a single monitored region and quarter period
+   * (defaults to the current one).
    */
-  async runAnalysis(region: string): Promise<string> {
-    this.logger.log(`Running geographical analysis for region: ${region}`);
-    const result = await this.workflow.invoke({ region });
+  async runAnalysis(
+    region: string,
+    period: string = getCurrentPeriod('quarter'),
+  ): Promise<string> {
+    this.logger.log(
+      `Running geographical analysis for region: ${region}, period: ${period}`,
+    );
+    const result = await this.workflow.invoke({ region, period });
     this.logger.log('Geographical analysis complete.');
     return result.finalReport || 'No report generated.';
   }
@@ -194,5 +218,49 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
    */
   async getContext(region: string): Promise<string> {
     return this.archivist.retrieveData(region);
+  }
+
+  /**
+   * Generates the missing geographical analysis reports for past quarters
+   * across the given (or all monitored) regions, so stock analysis has
+   * historical regional context to draw on. Defaults to the 8 quarters
+   * (~2 years) before the current one, skipping any region/period that
+   * already has a report.
+   */
+  async backfillAllRegions(
+    from?: string,
+    to?: string,
+    regions?: string[],
+  ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
+    const targetRegions = regions?.length
+      ? regions
+      : this.listRegions().map((r) => r.region);
+    const resolvedTo = to ?? addPeriods(getCurrentPeriod('quarter'), -1);
+    const resolvedFrom =
+      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
+    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+
+    const ranPeriods: string[] = [];
+    const skippedPeriods: string[] = [];
+    for (const region of targetRegions) {
+      for (const period of periods) {
+        if (
+          await this.broaderReportsService.hasReportForPeriod(
+            'geographical',
+            region,
+            period,
+          )
+        ) {
+          this.logger.log(
+            `Skipping ${region}/${period}: report already exists.`,
+          );
+          skippedPeriods.push(`${region}:${period}`);
+          continue;
+        }
+        await this.runAnalysis(region, period);
+        ranPeriods.push(`${region}:${period}`);
+      }
+    }
+    return { ranPeriods, skippedPeriods };
   }
 }

@@ -15,28 +15,32 @@ export class ArchivistService {
     private readonly broaderReportsService: BroaderReportsService,
   ) {}
 
-  async storeRawData(rawData: string): Promise<void> {
+  async storeRawData(rawData: string, period: string): Promise<void> {
     this.logger.log('Archiving raw data...');
     const documents = [
       new Document({
         pageContent: rawData,
-        metadata: { domain: 'global', type: 'raw-data' },
+        metadata: { domain: 'global', type: 'raw-data', period },
       }),
     ];
     await this.vectorStore.addDocuments(documents);
     this.logger.log('Raw data archiving complete.');
   }
 
-  async storeFinalReport(query: string, finalReport: string): Promise<void> {
+  async storeFinalReport(
+    query: string,
+    finalReport: string,
+    period: string,
+  ): Promise<void> {
     this.logger.log('Archiving final report to vector store...');
     const documents = [
       new Document({
         pageContent: finalReport,
-        metadata: { domain: 'global', type: 'final-report' },
+        metadata: { domain: 'global', type: 'final-report', period },
       }),
     ];
     await this.vectorStore.addDocuments(documents);
-    await this.broaderReportsService.save('global', query, finalReport);
+    await this.broaderReportsService.save('global', query, finalReport, period);
     this.logger.log('Final report successfully archived.');
   }
 

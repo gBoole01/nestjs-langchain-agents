@@ -13,6 +13,7 @@ import { BroaderReportsService } from 'src/agents/broader-analysis/broader-repor
 import { BroaderReportDocument } from 'src/agents/broader-analysis/models/broader-report.model';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
+import { BackfillSectorDto } from './dto/backfill-sector.dto';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
 import { RunSectorAnalysisDto } from './dto/run-sector-analysis.dto';
 import { SectorialAnalysisAgentService } from './sectorial-analysis-agent.service';
@@ -45,6 +46,24 @@ export class SectorialAnalysisAgentController {
       this.sectorialAnalysisAgentService
         .runAnalysisForAllSectors()
         .then(() => 'All sectors analyzed.'),
+    );
+  }
+
+  @Post('backfill')
+  @HttpCode(202)
+  backfill(@Body() dto: BackfillSectorDto): RunRecord {
+    if (this.analysisRunsService.hasPendingRun('sector-analysis-backfill')) {
+      throw new ConflictException(
+        'A sectorial analysis backfill is already in progress',
+      );
+    }
+    return this.analysisRunsService.start(
+      'sector-analysis-backfill',
+      dto,
+      () =>
+        this.sectorialAnalysisAgentService
+          .backfillAllSectors(dto.from, dto.to, dto.sectors)
+          .then((summary) => JSON.stringify(summary)),
     );
   }
 

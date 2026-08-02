@@ -10,8 +10,15 @@ import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.ut
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
+import {
+  addPeriods,
+  enumeratePeriods,
+  getCurrentPeriod,
+  getPeriodLabel,
+} from 'src/agents/broader-analysis/period.util';
 
 const FRESHNESS_WINDOW_MONTHS = 3;
+const BACKFILL_LOOKBACK_PERIODS = 8;
 
 /**
  * This agent will run for each monitored activity sector.
@@ -56,6 +63,7 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
   private initializeWorkflow() {
     const SectorialAnalysisState = Annotation.Root({
       sector: Annotation<string>(),
+      period: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
       finalReport: Annotation<string>(),
@@ -64,10 +72,10 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
     this.workflow = new StateGraph(SectorialAnalysisState)
       .addNode('fetch_new_data', async (state) => {
         this.logger.log(
-          `Step 1: Calling Research Team for fresh data on "${state.sector}"...`,
+          `Step 1: Calling Research Team for data on "${state.sector}" for ${state.period}...`,
         );
         const rawData = await this.researchTeam.runQuery(
-          `Latest industry outlook, demand trends, competitive landscape and regulation for sector: ${state.sector}`,
+          `Industry outlook, demand trends, competitive landscape and regulation for sector: ${state.sector}, for ${getPeriodLabel(state.period)}`,
         );
         return { rawData: rawData };
       })
@@ -76,7 +84,11 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
         this.logger.log(
           'Step 2: Storing new data and retrieving historical context...',
         );
-        await this.archivist.storeRawData(state.sector, state.rawData);
+        await this.archivist.storeRawData(
+          state.sector,
+          state.rawData,
+          state.period,
+        );
         const historicalContext = await this.archivist.retrieveData(
           state.sector,
         );
@@ -88,19 +100,21 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
         const prompt = ChatPromptTemplate.fromMessages([
           [
             'system',
-            `You are a highly skilled sector/industry analyst. Your task is to write a comprehensive outlook report for the sector: {sector}.
+            `You are a highly skilled sector/industry analyst. Your task is to write a comprehensive outlook report for the sector: {sector}, for the period {period_label}.
              Use the following new data and historical context to inform your analysis.
+             If this period is not the current one, frame the report as a retrospective analysis of that period rather than a forward-looking outlook.
              New Data: {raw_data}
              Historical Context: {historical_context}`,
           ],
           [
             'human',
-            'Please write a well-structured and insightful sector outlook report for {sector}.',
+            'Please write a well-structured and insightful sector outlook report for {sector} for {period_label}.',
           ],
         ]);
         const chain = prompt.pipe(this.model);
         const finalReport = await chain.invoke({
           sector: state.sector,
+          period_label: getPeriodLabel(state.period),
           raw_data: state.rawData,
           historical_context: state.historicalContext,
         });
@@ -109,7 +123,11 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
 
       .addNode('archive_final_report', async (state) => {
         this.logger.log('Step 4: Archiving the final report...');
-        await this.archivist.storeFinalReport(state.sector, state.finalReport);
+        await this.archivist.storeFinalReport(
+          state.sector,
+          state.finalReport,
+          state.period,
+        );
         return {};
       })
 
@@ -146,11 +164,17 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
 
   /**
    * Runs the full sectorial analysis workflow (research -> critique loop ->
-   * synthesize -> archive) for a single monitored sector.
+   * synthesize -> archive) for a single monitored sector and quarter period
+   * (defaults to the current one).
    */
-  async runAnalysis(sector: string): Promise<string> {
-    this.logger.log(`Running sectorial analysis for sector: ${sector}`);
-    const result = await this.workflow.invoke({ sector });
+  async runAnalysis(
+    sector: string,
+    period: string = getCurrentPeriod('quarter'),
+  ): Promise<string> {
+    this.logger.log(
+      `Running sectorial analysis for sector: ${sector}, period: ${period}`,
+    );
+    const result = await this.workflow.invoke({ sector, period });
     this.logger.log('Sectorial analysis complete.');
     return result.finalReport || 'No report generated.';
   }
@@ -187,5 +211,49 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
    */
   async getContext(sector: string): Promise<string> {
     return this.archivist.retrieveData(sector);
+  }
+
+  /**
+   * Generates the missing sectorial analysis reports for past quarters
+   * across the given (or all monitored) sectors, so stock analysis has
+   * historical sector context to draw on. Defaults to the 8 quarters
+   * (~2 years) before the current one, skipping any sector/period that
+   * already has a report.
+   */
+  async backfillAllSectors(
+    from?: string,
+    to?: string,
+    sectors?: string[],
+  ): Promise<{ ranPeriods: string[]; skippedPeriods: string[] }> {
+    const targetSectors = sectors?.length
+      ? sectors
+      : this.listSectors().map((s) => s.sector);
+    const resolvedTo = to ?? addPeriods(getCurrentPeriod('quarter'), -1);
+    const resolvedFrom =
+      from ?? addPeriods(resolvedTo, -(BACKFILL_LOOKBACK_PERIODS - 1));
+    const periods = enumeratePeriods(resolvedFrom, resolvedTo);
+
+    const ranPeriods: string[] = [];
+    const skippedPeriods: string[] = [];
+    for (const sector of targetSectors) {
+      for (const period of periods) {
+        if (
+          await this.broaderReportsService.hasReportForPeriod(
+            'sectorial',
+            sector,
+            period,
+          )
+        ) {
+          this.logger.log(
+            `Skipping ${sector}/${period}: report already exists.`,
+          );
+          skippedPeriods.push(`${sector}:${period}`);
+          continue;
+        }
+        await this.runAnalysis(sector, period);
+        ranPeriods.push(`${sector}:${period}`);
+      }
+    }
+    return { ranPeriods, skippedPeriods };
   }
 }

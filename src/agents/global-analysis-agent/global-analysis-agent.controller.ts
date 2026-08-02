@@ -1,4 +1,5 @@
 import {
+  Body,
   ConflictException,
   Controller,
   Get,
@@ -12,6 +13,7 @@ import { BroaderReportsService } from 'src/agents/broader-analysis/broader-repor
 import { BroaderReportDocument } from 'src/agents/broader-analysis/models/broader-report.model';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { RunRecord } from 'src/runs/run.types';
+import { BackfillGlobalDto } from './dto/backfill-global.dto';
 import { ListReportsQueryDto } from './dto/list-reports-query.dto';
 import { GlobalAnalysisAgentService } from './global-analysis-agent.service';
 
@@ -33,6 +35,24 @@ export class GlobalAnalysisAgentController {
     }
     return this.analysisRunsService.start('global-analysis', {}, () =>
       this.globalAnalysisAgentService.runAnalysis(),
+    );
+  }
+
+  @Post('backfill')
+  @HttpCode(202)
+  backfill(@Body() dto: BackfillGlobalDto): RunRecord {
+    if (this.analysisRunsService.hasPendingRun('global-analysis-backfill')) {
+      throw new ConflictException(
+        'A global analysis backfill is already in progress',
+      );
+    }
+    return this.analysisRunsService.start(
+      'global-analysis-backfill',
+      dto,
+      () =>
+        this.globalAnalysisAgentService
+          .backfill(dto.from, dto.to)
+          .then((summary) => JSON.stringify(summary)),
     );
   }
 

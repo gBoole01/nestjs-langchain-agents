@@ -2,6 +2,7 @@ import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Holding, HoldingSchema } from './models/holding.model';
+import { Order, OrderSchema } from './models/order.model';
 import {
   WatchedTicker,
   WatchedTickerSchema,
@@ -16,6 +17,7 @@ import { PortfolioTool } from './portfolio.tool';
     MongooseModule.forFeature([
       { name: Holding.name, schema: HoldingSchema },
       { name: WatchedTicker.name, schema: WatchedTickerSchema },
+      { name: Order.name, schema: OrderSchema },
     ]),
   ],
   controllers: [PortfolioController],

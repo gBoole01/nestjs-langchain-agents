@@ -3,9 +3,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createAgent } from 'langchain';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
+import { WriterReport } from '../stock-analysis-agent.types';
 
 export interface CritiqueReportInput {
-  report: string;
+  report: WriterReport;
   dataAnalysis: any;
   newsAnalysis: any;
   archivistReport: string;
@@ -49,11 +50,14 @@ export class CriticAgentService implements OnModuleInit {
         tools: [],
         systemPrompt: `You are a professional financial editor and quality assurance specialist. Your job is to critically evaluate a financial report for a specific stock ticker.
 
+The report is provided as JSON with a "sections" array (each with a "heading" and "content"), an "overallSentiment" (positive/negative/neutral), and a "priceTrend" (up/down/flat).
+
 Your task:
 1. Review the provided report against the original analysis data and news.
 2. Check for factual consistency, objectivity, and proper formatting.
-3. Provide a clear verdict: "PASS" if the report is satisfactory, or "FAIL" if it needs revision.
-4. If you "FAIL" the report, provide specific, actionable feedback on what needs to be corrected.
+3. Check that "overallSentiment" and "priceTrend" are actually justified by the section content and source data.
+4. Provide a clear verdict: "PASS" if the report is satisfactory, or "FAIL" if it needs revision.
+5. If you "FAIL" the report, provide specific, actionable feedback on what needs to be corrected.
 
 You must be strict and objective. Do not pass a report that contains inconsistencies or is poorly formatted.`,
       });
@@ -90,7 +94,7 @@ You must be strict and objective. Do not pass a report that contains inconsisten
       Please provide a constructive review of the following financial report. Evaluate its accuracy, clarity, and adherence to the source data (including the broader global/regional/sector context, which is also a valid source).
 
       ### Report to Review:
-      ${report}
+      ${JSON.stringify(report, null, 2)}
 
       ### Original Data Analysis:
       ${JSON.stringify(dataAnalysis, null, 2)}

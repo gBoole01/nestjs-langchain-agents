@@ -48,9 +48,9 @@ npm run start:dev
 - [x] Add portfolio analysis on portfolio page
 - [x] Add related latest reports on portfolio detail page
 - [x] Add administration page to manage the catalog
-- [ ] Add order management to provide a better tracking of portfolio evolutions
+- [x] Add order management to provide a better tracking of portfolio evolutions
 - [x] Adjusts the backfill/reports period to be more specific
-- [ ] On stock analysis, return a structured response to enhance the vector chunking and allow split displays on the frontend with the following fields:
+- [x] On stock analysis, return a structured response to enhance the vector chunking and allow split displays on the frontend with the following fields:
   - Report
   - Overall Sentiment (Positive, Negative, Neutral)
   - Raising Trend (Up, Down, No Change)

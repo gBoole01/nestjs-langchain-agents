@@ -12,6 +12,8 @@ import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
 import { PortfolioAnalystAgentService } from './crew/portfolio-analyst.service';
 import { WriterAgentService } from './crew/writer-agent.service';
+import { WriterReport } from './stock-analysis-agent.types';
+import { renderReportMarkdown } from './utils/render-report.util';
 
 const NO_CONTEXT_MESSAGE = 'No region/sector mapped for this ticker.';
 
@@ -60,7 +62,7 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
       global_report: Annotation<string>(),
       geo_report: Annotation<string>(),
       sector_report: Annotation<string>(),
-      writer_draft: Annotation<string>(),
+      writer_draft: Annotation<WriterReport>(),
       critic_verdict: Annotation<'PASS' | 'FAIL'>(),
       critic_feedback: Annotation<string>(),
     });
@@ -107,12 +109,15 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
 
     try {
       this.logger.log('Testing agent with sample query...');
-      const result = await this.agent.invoke({
+      const date = new Date().toISOString().split('T')[0];
+      const result = await this.agent.invoke({ ticker, date });
+      const reportMarkdown = renderReportMarkdown(
         ticker,
-        date: new Date().toISOString().split('T')[0],
-      });
-      this.discordService.sendToDiscord(result.writer_draft);
-      return result.writer_draft;
+        date,
+        result.writer_draft,
+      );
+      this.discordService.sendToDiscord(reportMarkdown);
+      return reportMarkdown;
     } catch (error) {
       this.logger.error('Agent test failed:', error.message);
       throw error;

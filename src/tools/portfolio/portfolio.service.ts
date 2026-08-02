@@ -10,9 +10,11 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Model } from 'mongoose';
 import { CreateHoldingDto } from './dto/create-holding.dto';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateWatchlistItemDto } from './dto/create-watchlist-item.dto';
 import { UpdateHoldingDto } from './dto/update-holding.dto';
 import { Holding, HoldingDocument } from './models/holding.model';
+import { Order, OrderDocument } from './models/order.model';
 import {
   WatchedTicker,
   WatchedTickerDocument,
@@ -29,6 +31,8 @@ export class PortfolioService implements OnModuleInit {
     private readonly holdingModel: Model<HoldingDocument>,
     @InjectModel(WatchedTicker.name)
     private readonly watchedTickerModel: Model<WatchedTickerDocument>,
+    @InjectModel(Order.name)
+    private readonly orderModel: Model<OrderDocument>,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -126,6 +130,57 @@ export class PortfolioService implements OnModuleInit {
     if (result.deletedCount === 0) {
       throw new NotFoundException(`Watchlist item ${ticker} not found`);
     }
+  }
+
+  findAllOrders(): Promise<OrderDocument[]> {
+    return this.orderModel.find().sort({ executedAt: -1 }).exec();
+  }
+
+  findOrdersByTicker(ticker: string): Promise<OrderDocument[]> {
+    return this.orderModel.find({ ticker }).sort({ executedAt: -1 }).exec();
+  }
+
+  /**
+   * Placing an order is the source of truth for position changes: a buy
+   * creates the holding if it doesn't exist yet (or increments its shares),
+   * a sell decrements it. Sells that would take shares negative are
+   * rejected outright rather than clamped, so the holding never drifts out
+   * of sync with the recorded order history.
+   */
+  async placeOrder(dto: CreateOrderDto): Promise<OrderDocument> {
+    const holding = await this.holdingModel.findOne({ ticker: dto.ticker }).exec();
+
+    if (dto.side === 'sell' && (!holding || holding.shares < dto.shares)) {
+      throw new ConflictException(
+        `Insufficient shares of ${dto.ticker} to sell: holding has ${holding?.shares ?? 0}, order requests ${dto.shares}`,
+      );
+    }
+
+    const order = await this.orderModel.create({
+      ticker: dto.ticker,
+      side: dto.side,
+      shares: dto.shares,
+      price: dto.price,
+      ...(dto.executedAt ? { executedAt: new Date(dto.executedAt) } : {}),
+    });
+
+    const shareDelta = dto.side === 'buy' ? dto.shares : -dto.shares;
+    if (holding) {
+      await this.holdingModel
+        .updateOne(
+          { ticker: dto.ticker },
+          { $inc: { shares: shareDelta }, $set: { currentPrice: dto.price } },
+        )
+        .exec();
+    } else {
+      await this.holdingModel.create({
+        ticker: dto.ticker,
+        shares: shareDelta,
+        currentPrice: dto.price,
+      });
+    }
+
+    return order;
   }
 
   /**

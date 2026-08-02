@@ -12,7 +12,7 @@ import { Model } from 'mongoose';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { Report, ReportDocument } from '../models/reports.model';
-import { AgentResult } from '../stock-analysis-agent.types';
+import { AgentResult, WriterReport } from '../stock-analysis-agent.types';
 
 @Injectable()
 export class ArchivistAgentService implements OnModuleInit {
@@ -141,44 +141,57 @@ Never attempt to answer a query without first using your tool. Your entire exist
 
   /**
    * Saves a new report to the appropriate database based on the environment.
+   * Each section is embedded individually so retrieval can match on
+   * topically-focused vectors instead of one blended whole-report vector.
    * @param ticker The stock ticker symbol.
-   * @param reportContent The full content of the generated report.
+   * @param report The structured report produced by the Writer agent.
    * @returns An AgentResult indicating success or failure.
    */
-  async saveReport(
-    ticker: string,
-    reportContent: string,
-  ): Promise<AgentResult> {
+  async saveReport(ticker: string, report: WriterReport): Promise<AgentResult> {
     if (!this.isInitialized || !this.embeddings) {
       return { success: false, error: 'Archivist Agent is not initialized.' };
     }
 
     try {
+      const date = new Date();
+      const sectionVectors = await this.embeddings.embedDocuments(
+        report.sections.map((section) => section.content),
+      );
+
+      const sections = report.sections.map((section, index) => ({
+        heading: section.heading,
+        content: section.content,
+        ...(this.isProduction ? { vector: sectionVectors[index] } : {}),
+      }));
+
       const newReport = new this.reportModel({
         ticker,
-        reportContent,
-        date: new Date(),
+        date,
+        sections,
+        overallSentiment: report.overallSentiment,
+        priceTrend: report.priceTrend,
       });
       const savedReport = await newReport.save();
-      const [vector] = await this.embeddings.embedDocuments([reportContent]);
 
-      if (this.isProduction) {
-        await this.reportModel.findByIdAndUpdate(savedReport._id, {
-          vector: vector as number[],
-        });
-      } else {
-        const document: Document = {
-          pageContent: reportContent,
+      if (!this.isProduction) {
+        const documents: Document[] = report.sections.map((section) => ({
+          pageContent: section.content,
           metadata: {
-            ticker: ticker,
-            date: savedReport.date.toISOString(),
+            ticker,
+            date: date.toISOString(),
+            heading: section.heading,
+            sentiment: report.overallSentiment,
+            priceTrend: report.priceTrend,
+            reportId: savedReport._id.toString(),
             source: 'generated-report',
           },
-        };
+        }));
         await this.chromaCollection.add({
-          ids: [savedReport._id.toString()],
-          documents: [document.pageContent],
-          metadatas: [document.metadata],
+          ids: report.sections.map(
+            (_, index) => `${savedReport._id.toString()}-${index}`,
+          ),
+          documents: documents.map((document) => document.pageContent),
+          metadatas: documents.map((document) => document.metadata),
         });
       }
 
@@ -216,7 +229,7 @@ Never attempt to answer a query without first using your tool. Your entire exist
     const filter = ticker ? { ticker } : {};
     return this.reportModel
       .find(filter)
-      .select('-vector')
+      .select('-sections.vector')
       .sort({ date: -1 })
       .exec();
   }
@@ -226,56 +239,6 @@ Never attempt to answer a query without first using your tool. Your entire exist
    * @param id The Mongo document id.
    */
   async getReportById(id: string): Promise<ReportDocument | null> {
-    return this.reportModel.findById(id).select('-vector').exec();
-  }
-
-  /**
-   * Retrieves relevant reports using the appropriate database for the environment.
-   * @param query The user's search query.
-   * @returns A JSON string of the most relevant reports.
-   */
-  async retrieveReports(query: string): Promise<string> {
-    if (!this.isInitialized || !this.embeddings) {
-      throw new Error('Archivist Agent is not initialized.');
-    }
-
-    try {
-      const [queryVector] = await this.embeddings.embedDocuments([query]);
-
-      if (this.isProduction) {
-        const results = await this.reportModel
-          .aggregate([
-            {
-              $vectorSearch: {
-                index: 'vector_index',
-                path: 'vector',
-                queryVector: queryVector,
-                numCandidates: 100,
-                limit: 5,
-              },
-            },
-            { $project: { reportContent: 1, _id: 0 } },
-          ])
-          .exec();
-
-        if (!results || results.length === 0) {
-          return 'No relevant reports found in the archive.';
-        }
-        return JSON.stringify(results.map((doc) => doc.reportContent));
-      } else {
-        const results = await this.chromaCollection.query({
-          queryTexts: [query],
-          nResults: 5,
-        });
-
-        if (!results.documents || results.documents[0].length === 0) {
-          return 'No relevant reports found in the archive.';
-        }
-        return results.documents[0].join('\n\n---\n\n');
-      }
-    } catch (error) {
-      this.logger.error('Failed to retrieve reports:', error.message);
-      throw new Error('An error occurred while retrieving historical reports.');
-    }
+    return this.reportModel.findById(id).select('-sections.vector').exec();
   }
 }

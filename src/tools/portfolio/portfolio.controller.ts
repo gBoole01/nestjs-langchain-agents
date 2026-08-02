@@ -9,6 +9,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { CreateHoldingDto } from './dto/create-holding.dto';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateWatchlistItemDto } from './dto/create-watchlist-item.dto';
 import { UpdateHoldingDto } from './dto/update-holding.dto';
 import { PortfolioService } from './portfolio.service';
@@ -57,5 +58,21 @@ export class PortfolioController {
   @HttpCode(204)
   removeWatchlistItem(@Param('ticker') ticker: string) {
     return this.portfolioService.removeWatchlistItem(ticker);
+  }
+
+  @Get('orders')
+  findAllOrders() {
+    return this.portfolioService.findAllOrders();
+  }
+
+  @Get('orders/:ticker')
+  findOrdersByTicker(@Param('ticker') ticker: string) {
+    return this.portfolioService.findOrdersByTicker(ticker);
+  }
+
+  @Post('orders')
+  @HttpCode(201)
+  placeOrder(@Body() dto: CreateOrderDto) {
+    return this.portfolioService.placeOrder(dto);
   }
 }

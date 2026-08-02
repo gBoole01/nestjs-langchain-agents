@@ -1,3 +1,31 @@
+import { z } from 'zod';
+
+export const writerReportSchema = z.object({
+  sections: z
+    .array(
+      z.object({
+        heading: z
+          .string()
+          .describe(
+            'Section heading, e.g. "Executive Summary", "Technical Analysis".',
+          ),
+        content: z
+          .string()
+          .describe('Markdown content of the section (no heading itself).'),
+      }),
+    )
+    .min(1)
+    .describe('Ordered sections making up the report.'),
+  overallSentiment: z
+    .enum(['positive', 'negative', 'neutral'])
+    .describe('Overall sentiment conveyed by the report.'),
+  priceTrend: z
+    .enum(['up', 'down', 'flat'])
+    .describe('Overall price trend observed over the analyzed period.'),
+});
+
+export type WriterReport = z.infer<typeof writerReportSchema>;
+
 export interface AgentResult {
   success: boolean;
   data?: any;

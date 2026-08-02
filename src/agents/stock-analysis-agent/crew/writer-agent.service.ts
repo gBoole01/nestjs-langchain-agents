@@ -7,6 +7,7 @@ import {
   AgentResult,
   DataAnalysisResult,
   NewsAnalysisResult,
+  writerReportSchema,
 } from '../stock-analysis-agent.types';
 
 export interface WriteReportInput {
@@ -55,6 +56,7 @@ export class WriterAgentService implements OnModuleInit {
       this.agent = createAgent({
         model,
         tools: [],
+        responseFormat: writerReportSchema,
         systemPrompt: `You are a professional financial journalist tasked with writing a comprehensive report for a stock.
 Your report must be:
 -   Objective and factual, based only on the provided data.
@@ -71,6 +73,8 @@ Report Structure:
 -   **Conclusion & Portfolio Action:** Provide a final, balanced assessment and, based on the user's portfolio, offer a concrete, actionable recommendation.
 
 You will be provided with technical data, news analysis, a previous report, and broader global/regional/sector context. If you are provided with revision feedback, you MUST incorporate it to improve your draft.
+
+Your final answer will be converted into structured JSON: use exactly the five section headings above, and classify the report's overall sentiment (positive, negative, or neutral) and the stock's overall price trend (up, down, or flat) based on the data provided.
 `,
       });
 
@@ -151,15 +155,10 @@ Ensure you address all points and resubmit a high-quality, final report.
       const result = await this.agent.invoke({
         messages: [{ role: 'user', content: promptInput }],
       });
-      const lastMessage = result.messages[result.messages.length - 1];
-      const output =
-        typeof lastMessage.content === 'string'
-          ? lastMessage.content
-          : JSON.stringify(lastMessage.content);
 
       return {
         success: true,
-        data: output,
+        data: result.structuredResponse,
         metadata: { agent: 'writer', timestamp: new Date().toISOString() },
       };
     } catch (error) {

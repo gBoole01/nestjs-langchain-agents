@@ -5,6 +5,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { ChromaClient, EmbeddingFunction } from 'chromadb';
 import { Model } from 'mongoose';
 import { ReportDocument } from 'src/agents/stock-analysis-agent/models/reports.model';
+import { renderReportMarkdown } from 'src/agents/stock-analysis-agent/utils/render-report.util';
 
 @Injectable()
 export class ReportRetrievalService {
@@ -53,20 +54,37 @@ export class ReportRetrievalService {
             {
               $vectorSearch: {
                 index: 'vector_index',
-                path: 'vector',
+                path: 'sections.vector',
                 queryVector: queryVector,
                 numCandidates: 100,
                 limit: 5,
               },
             },
-            { $project: { reportContent: 1, _id: 0 } },
+            {
+              $project: {
+                ticker: 1,
+                date: 1,
+                sections: { heading: 1, content: 1 },
+                overallSentiment: 1,
+                priceTrend: 1,
+                _id: 0,
+              },
+            },
           ])
           .exec();
 
         if (!results || results.length === 0) {
           return 'No relevant reports found in the archive.';
         }
-        return JSON.stringify(results.map((doc) => doc.reportContent));
+        return JSON.stringify(
+          results.map((doc) =>
+            renderReportMarkdown(
+              doc.ticker,
+              new Date(doc.date).toISOString().split('T')[0],
+              doc,
+            ),
+          ),
+        );
       } else {
         const results = await this.chromaCollection.query({
           queryTexts: [query],

@@ -9,7 +9,8 @@ import { CriticAgentService } from './crew/critic-agent.service';
 import { DataAnalystAgentService } from './crew/data-analyst-agent.service';
 import { JournalistAgentService } from './crew/journalist-agent.service';
 import { WriterAgentService } from './crew/writer-agent.service';
-import { AnalysisRequest } from './stock-analysis-agent.types';
+import { AnalysisRequest, WriterReport } from './stock-analysis-agent.types';
+import { renderReportMarkdown } from './utils/render-report.util';
 
 const NO_CONTEXT_MESSAGE = 'No region/sector mapped for this ticker.';
 
@@ -106,8 +107,8 @@ export class StockAnalysisAgentService implements OnModuleInit {
       ]);
 
       // Step 3: Generate final report and submit to Critic Agent
-      let finalReport = '';
-      let currentDraft = '';
+      let finalReport: WriterReport | null = null;
+      let currentDraft: WriterReport | null = null;
       let critiqueVerdict: { verdict: 'PASS' | 'FAIL'; feedback?: string } = {
         verdict: 'FAIL',
       };
@@ -137,9 +138,9 @@ export class StockAnalysisAgentService implements OnModuleInit {
         if (!writerResult.success) {
           throw new Error(`Report generation failed: ${writerResult.error}`);
         }
-        const report = writerResult.data;
+        const report: WriterReport = writerResult.data;
         this.logger.log(
-          `Writer Agent produced draft (Iteration ${iterationCount}):\n${report}`,
+          `Writer Agent produced draft (Iteration ${iterationCount}):\n${JSON.stringify(report)}`,
         );
 
         // Call the Critic Agent to evaluate the report
@@ -173,11 +174,11 @@ export class StockAnalysisAgentService implements OnModuleInit {
         );
         // Save the last draft, even if it failed the critique
         await this.archivistAgent.saveReport(ticker, currentDraft);
-        return currentDraft;
+        return renderReportMarkdown(ticker, date, currentDraft);
       } else {
         // Save the successful report to the database
         await this.archivistAgent.saveReport(ticker, finalReport);
-        return finalReport;
+        return renderReportMarkdown(ticker, date, finalReport);
       }
     } catch (error) {
       this.logger.error('Complete analysis failed:', error.message);

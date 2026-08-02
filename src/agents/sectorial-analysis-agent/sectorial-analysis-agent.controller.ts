@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -26,7 +27,12 @@ export class SectorialAnalysisAgentController {
 
   @Post('runs')
   @HttpCode(202)
-  run(@Body() dto: RunSectorAnalysisDto): RunRecord {
+  async run(@Body() dto: RunSectorAnalysisDto): Promise<RunRecord> {
+    if (await this.sectorialAnalysisAgentService.hasFreshReport(dto.sector)) {
+      throw new ConflictException(
+        `Sectorial analysis for ${dto.sector} has already run within the last 3 months`,
+      );
+    }
     return this.analysisRunsService.start('sector-analysis', dto, () =>
       this.sectorialAnalysisAgentService.runAnalysis(dto.sector),
     );

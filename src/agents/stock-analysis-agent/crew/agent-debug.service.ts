@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ReportRetrievalTool } from 'src/tools/rag/report-retrieval.tool';
 import { SerperNewsTool } from 'src/tools/serper/serper-news.tool';
 import { SerperWebTool } from 'src/tools/serper/serper-web.tool';
-import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
+import { FetchStockDataTool } from 'src/tools/market-data/fetch-stock-data.tool';
 
 @Injectable()
 export class AgentDebugService implements OnModuleInit {

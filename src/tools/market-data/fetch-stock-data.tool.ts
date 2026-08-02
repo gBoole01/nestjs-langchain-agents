@@ -1,7 +1,7 @@
 import { tool } from '@langchain/core/tools';
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
-import { TiingoService } from './tiingo.service';
+import { MarketDataService } from './market-data.service';
 
 /**
  * Zod schema for the input of the FetchStockDataTool.
@@ -14,11 +14,12 @@ const fetchStockDataSchema = z.object({
 
 /**
  * Service that creates a stock data fetching tool using the modern tool() function.
- * This is the recommended approach in LangChain v0.2.7+.
+ * Reads from the Mongo-backed market data cache (populated daily by
+ * MarketDataScraperService) instead of calling the Tiingo API directly.
  */
 @Injectable()
 export class FetchStockDataTool {
-  constructor(private readonly tiingoService: TiingoService) {}
+  constructor(private readonly marketDataService: MarketDataService) {}
 
   getTool() {
     return tool(
@@ -48,7 +49,7 @@ export class FetchStockDataTool {
             });
           }
 
-          const data = await this.tiingoService.fetchMarketData(
+          const data = await this.marketDataService.getPriceHistory(
             ticker.toUpperCase(),
             startDate,
             endDate,
@@ -56,7 +57,7 @@ export class FetchStockDataTool {
 
           if (!data || data.length === 0) {
             return JSON.stringify({
-              message: `No market data found for ticker ${ticker.toUpperCase()} between ${startDate} and ${endDate}. This could be due to weekends, holidays, or invalid ticker symbol.`,
+              message: `No market data found for ticker ${ticker.toUpperCase()} between ${startDate} and ${endDate}. This could be due to weekends, holidays, an invalid ticker symbol, or the daily scrape not having run for this ticker yet.`,
               ticker: ticker.toUpperCase(),
               startDate,
               endDate,
@@ -132,13 +133,13 @@ export class FetchStockDataTool {
           Fetch historical stock market data for a given ticker symbol.
           This tool retrieves daily market data including open, high, low, close prices and trading volume.
           It also provides summary statistics including price changes and percentage changes over the period.
-          
+
           Use this tool when users ask for:
           - Stock prices for specific dates or date ranges
           - Historical market data and trends
           - Price changes and performance analysis
           - Trading volume information
-          
+
           The tool returns formatted JSON data with detailed market information and summary statistics.
         `.trim(),
         schema: fetchStockDataSchema,

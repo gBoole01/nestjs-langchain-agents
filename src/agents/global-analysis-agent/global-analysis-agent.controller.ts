@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -24,7 +25,12 @@ export class GlobalAnalysisAgentController {
 
   @Post('runs')
   @HttpCode(202)
-  run(): RunRecord {
+  async run(): Promise<RunRecord> {
+    if (await this.globalAnalysisAgentService.hasFreshReport()) {
+      throw new ConflictException(
+        'Global analysis has already run within the last 6 months',
+      );
+    }
     return this.analysisRunsService.start('global-analysis', {}, () =>
       this.globalAnalysisAgentService.runAnalysis(),
     );

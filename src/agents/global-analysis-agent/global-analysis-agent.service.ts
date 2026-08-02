@@ -3,11 +3,14 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { Annotation, END, StateGraph } from '@langchain/langgraph';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
+import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
 
 const GLOBAL_ANALYSIS_SUBJECT = 'global economic outlook';
+const FRESHNESS_WINDOW_MONTHS = 6;
 
 @Injectable()
 export class GlobalAnalysisAgentService implements OnModuleInit {
@@ -19,6 +22,8 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly researchTeam: ResearchOrchestratorService,
     private readonly archivist: ArchivistService,
+    private readonly broaderReportsService: BroaderReportsService,
+    private readonly analysisRunsService: AnalysisRunsService,
   ) {}
 
   async onModuleInit() {
@@ -117,9 +122,24 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
       .compile();
   }
   /**
+   * True if the global analysis has already run (or is currently running)
+   * within the last 6 months.
+   */
+  async hasFreshReport(): Promise<boolean> {
+    if (this.analysisRunsService.hasPendingRun('global-analysis')) {
+      return true;
+    }
+    return this.broaderReportsService.hasReportWithinWindow(
+      'global',
+      FRESHNESS_WINDOW_MONTHS,
+    );
+  }
+
+  /**
    * Runs the entire global analysis workflow against the broad world
    * economic situation. Takes no input — unlike the geographical/sectorial
    * agents, there is only one global subject to analyze.
+   * TIMEFRAME: re-run at most once every 6 months (see hasFreshReport).
    */
   async runAnalysis(): Promise<string> {
     this.logger.log('Running global analysis...');

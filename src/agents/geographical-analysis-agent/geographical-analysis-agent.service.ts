@@ -5,15 +5,19 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
+import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
 
+const FRESHNESS_WINDOW_MONTHS = 3;
+
 /**
- * This agent will run monthly for each monitored geographical area.
+ * This agent will run for each monitored geographical area.
  * Then it will store the results in a database.
  * He will also expose its results to other agents.
- * TIMEFRAME: 6 months
+ * TIMEFRAME: re-run at most once every 3 months per region (see hasFreshReport).
  */
 @Injectable()
 export class GeographicalAnalysisAgentService implements OnModuleInit {
@@ -25,6 +29,8 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly researchTeam: ResearchOrchestratorService,
     private readonly archivist: ArchivistService,
+    private readonly broaderReportsService: BroaderReportsService,
+    private readonly analysisRunsService: AnalysisRunsService,
   ) {}
 
   async onModuleInit() {
@@ -117,6 +123,28 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * True if the given region already has a report (or a run in progress)
+   * within the last 3 months. Also true while a full "run all regions"
+   * sweep is in progress, since it may currently be processing this region.
+   */
+  async hasFreshReport(region: string): Promise<boolean> {
+    if (
+      this.analysisRunsService.hasPendingRun('geo-analysis-all') ||
+      this.analysisRunsService.hasPendingRun(
+        'geo-analysis',
+        (input) => input.region === region,
+      )
+    ) {
+      return true;
+    }
+    return this.broaderReportsService.hasReportWithinWindow(
+      'geographical',
+      FRESHNESS_WINDOW_MONTHS,
+      region,
+    );
+  }
+
+  /**
    * Runs the full geographical analysis workflow (research -> critique loop ->
    * synthesize -> archive) for a single monitored region.
    */
@@ -148,6 +176,12 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
   async runAnalysisForAllRegions(): Promise<void> {
     const geographies = this.listRegions();
     for (const { region } of geographies) {
+      if (await this.hasFreshReport(region)) {
+        this.logger.log(
+          `Skipping ${region}: analysis already fresh within the last ${FRESHNESS_WINDOW_MONTHS} months.`,
+        );
+        continue;
+      }
       await this.runAnalysis(region);
     }
   }

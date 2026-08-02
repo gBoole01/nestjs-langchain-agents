@@ -4,7 +4,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createAgent } from 'langchain';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
-import { FetchStockDataTool } from 'src/tools/tiingo/fetch-stock-data.tool';
+import { FetchStockDataTool } from 'src/tools/market-data/fetch-stock-data.tool';
 import { AgentResult, AnalysisRequest } from '../stock-analysis-agent.types';
 
 @Injectable()

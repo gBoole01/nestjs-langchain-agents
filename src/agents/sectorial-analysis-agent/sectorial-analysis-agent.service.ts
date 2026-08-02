@@ -5,15 +5,19 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
+import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
 import { ResearchOrchestratorService } from './crew/research-orchestrator.service';
 
+const FRESHNESS_WINDOW_MONTHS = 3;
+
 /**
- * This agent will run monthly for each monitored activity sector.
+ * This agent will run for each monitored activity sector.
  * Then it will store the results in a database.
  * He will also expose its results to other agents.
- * TIMEFRAME: 12 months
+ * TIMEFRAME: re-run at most once every 3 months per sector (see hasFreshReport).
  */
 @Injectable()
 export class SectorialAnalysisAgentService implements OnModuleInit {
@@ -25,6 +29,8 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
     private readonly configService: ConfigService,
     private readonly researchTeam: ResearchOrchestratorService,
     private readonly archivist: ArchivistService,
+    private readonly broaderReportsService: BroaderReportsService,
+    private readonly analysisRunsService: AnalysisRunsService,
   ) {}
 
   async onModuleInit() {
@@ -117,6 +123,28 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * True if the given sector already has a report (or a run in progress)
+   * within the last 3 months. Also true while a full "run all sectors"
+   * sweep is in progress, since it may currently be processing this sector.
+   */
+  async hasFreshReport(sector: string): Promise<boolean> {
+    if (
+      this.analysisRunsService.hasPendingRun('sector-analysis-all') ||
+      this.analysisRunsService.hasPendingRun(
+        'sector-analysis',
+        (input) => input.sector === sector,
+      )
+    ) {
+      return true;
+    }
+    return this.broaderReportsService.hasReportWithinWindow(
+      'sectorial',
+      FRESHNESS_WINDOW_MONTHS,
+      sector,
+    );
+  }
+
+  /**
    * Runs the full sectorial analysis workflow (research -> critique loop ->
    * synthesize -> archive) for a single monitored sector.
    */
@@ -141,6 +169,12 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
   async runAnalysisForAllSectors(): Promise<void> {
     const sectors = this.listSectors();
     for (const { sector } of sectors) {
+      if (await this.hasFreshReport(sector)) {
+        this.logger.log(
+          `Skipping ${sector}: analysis already fresh within the last ${FRESHNESS_WINDOW_MONTHS} months.`,
+        );
+        continue;
+      }
       await this.runAnalysis(sector);
     }
   }

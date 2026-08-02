@@ -2,6 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { GlobalAnalysisAgentModule } from './agents/global-analysis-agent/global-analysis-agent.module';
 import { ReportSchema } from './agents/stock-analysis-agent/models/reports.model';
 import { StockAnalysisAgentModule } from './agents/stock-analysis-agent/stock-analysis-agent.module';
@@ -9,6 +10,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DiscordModule } from './integrations/discord/discord.module';
 import { RunsModule } from './runs/runs.module';
+import { MarketDataModule } from './tools/market-data/market-data.module';
 import { PortfolioModule } from './tools/portfolio/portfolio.module';
 import { SerperModule } from './tools/serper/serper.module';
 import { TiingoModule } from './tools/tiingo/tiingo.module';
@@ -17,6 +19,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    ScheduleModule.forRoot(),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
@@ -80,6 +83,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
     SerperModule,
     WebScrapingModule,
     TiingoModule,
+    MarketDataModule,
     PortfolioModule,
     StockAnalysisAgentModule,
     GlobalAnalysisAgentModule,

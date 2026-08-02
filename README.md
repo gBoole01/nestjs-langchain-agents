@@ -40,6 +40,10 @@ npm run start:dev
 - [x] Add agent debug service
 - [x] Add enhanced memory
 - [x] Add archivist agent to stock analysis
+- [x] Run stock analysis once per day per portfolio/watchlist item
+- [x] For other analysis (e.g., global, regional, sector), limit them to one per semester for global and one per quarter for regional/sectorial
+- [x] Scrape and store tiingo data every day and have agents use it instead of calling the API
+- [ ] Add charts on frontend (sector repartition, item history, etc.)
 - [ ] Self-Correction with LLM Tools
 - [ ] Add planner agent to stock analysis
 - [ ] Expand data sources

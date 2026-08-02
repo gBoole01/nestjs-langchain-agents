@@ -191,6 +191,24 @@ Never attempt to answer a query without first using your tool. Your entire exist
   }
 
   /**
+   * Checks whether a report for the given ticker was already saved today (UTC).
+   * @param ticker The stock ticker symbol.
+   */
+  async hasReportToday(ticker: string): Promise<boolean> {
+    const startOfDay = new Date();
+    startOfDay.setUTCHours(0, 0, 0, 0);
+    const endOfDay = new Date(startOfDay);
+    endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+
+    return Boolean(
+      await this.reportModel.exists({
+        ticker,
+        date: { $gte: startOfDay, $lt: endOfDay },
+      }),
+    );
+  }
+
+  /**
    * Lists archived reports, most recent first, optionally filtered by ticker.
    * @param ticker Optional ticker to filter by.
    */

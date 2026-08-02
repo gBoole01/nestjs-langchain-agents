@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -26,7 +27,12 @@ export class GeographicalAnalysisAgentController {
 
   @Post('runs')
   @HttpCode(202)
-  run(@Body() dto: RunGeoAnalysisDto): RunRecord {
+  async run(@Body() dto: RunGeoAnalysisDto): Promise<RunRecord> {
+    if (await this.geographicalAnalysisAgentService.hasFreshReport(dto.region)) {
+      throw new ConflictException(
+        `Geographical analysis for ${dto.region} has already run within the last 3 months`,
+      );
+    }
     return this.analysisRunsService.start('geo-analysis', dto, () =>
       this.geographicalAnalysisAgentService.runAnalysis(dto.region),
     );

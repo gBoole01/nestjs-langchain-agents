@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -38,6 +39,11 @@ export class StockAnalysisAgentController {
         `Ticker ${dto.ticker} is not in the portfolio or watchlist`,
       );
     }
+    if (await this.hasAlreadyRunToday(dto.ticker)) {
+      throw new ConflictException(
+        `Analysis for ${dto.ticker} has already run today`,
+      );
+    }
     return this.analysisRunsService.start('stock-analysis', dto, () =>
       this.stockAnalysisAgentGraphService.runAgent(dto.ticker),
     );
@@ -55,11 +61,31 @@ export class StockAnalysisAgentController {
         `Tickers not in the portfolio or watchlist: ${untracked.join(', ')}`,
       );
     }
+
+    const alreadyRunFlags = await Promise.all(
+      dto.tickers.map((ticker) => this.hasAlreadyRunToday(ticker)),
+    );
+    const alreadyRun = dto.tickers.filter(
+      (_, index) => alreadyRunFlags[index],
+    );
+    if (alreadyRun.length > 0) {
+      throw new ConflictException(
+        `Analysis already run today for: ${alreadyRun.join(', ')}`,
+      );
+    }
+
     return dto.tickers.map((ticker) =>
       this.analysisRunsService.start('stock-analysis', { ticker }, () =>
         this.stockAnalysisAgentGraphService.runAgent(ticker),
       ),
     );
+  }
+
+  private async hasAlreadyRunToday(ticker: string): Promise<boolean> {
+    if (this.analysisRunsService.hasPendingRunToday('stock-analysis', ticker)) {
+      return true;
+    }
+    return this.archivistAgentService.hasReportToday(ticker);
   }
 
   @Post('portfolio-analysis')

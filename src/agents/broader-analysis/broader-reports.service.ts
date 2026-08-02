@@ -41,4 +41,24 @@ export class BroaderReportsService {
   ): Promise<BroaderReportDocument | null> {
     return this.broaderReportModel.findOne({ _id: id, domain }).exec();
   }
+
+  /**
+   * Checks whether a report for the given domain (and optional subject) was
+   * already saved within the last `months` months.
+   */
+  async hasReportWithinWindow(
+    domain: BroaderReportDomain,
+    months: number,
+    subject?: string,
+  ): Promise<boolean> {
+    const cutoff = new Date();
+    cutoff.setUTCMonth(cutoff.getUTCMonth() - months);
+
+    const filter: Record<string, any> = { domain, date: { $gte: cutoff } };
+    if (subject) {
+      filter.subject = subject;
+    }
+
+    return Boolean(await this.broaderReportModel.exists(filter));
+  }
 }

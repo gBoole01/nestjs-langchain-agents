@@ -99,10 +99,10 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
     }
   }
 
-  async runAgent(ticker: string): Promise<void> {
+  async runAgent(ticker: string): Promise<string> {
     if (!this.agent) {
       this.logger.warn('Agent is not initialized. Cannot run agent.');
-      return;
+      throw new Error('Agent is not initialized');
     }
 
     try {
@@ -112,8 +112,10 @@ export class StockAnalysisAgentGraphService implements OnModuleInit {
         date: new Date().toISOString().split('T')[0],
       });
       this.discordService.sendToDiscord(result.writer_draft);
+      return result.writer_draft;
     } catch (error) {
       this.logger.error('Agent test failed:', error.message);
+      throw error;
     }
   }
 

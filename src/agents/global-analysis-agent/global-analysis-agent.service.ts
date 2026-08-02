@@ -90,7 +90,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
       // Node 4: Archive the final report
       .addNode('archive_final_report', async (state) => {
         this.logger.log('Step 4: Archiving the final report...');
-        await this.archivist.storeFinalReport(state.finalReport);
+        await this.archivist.storeFinalReport(state.query, state.finalReport);
         return {};
       })
 

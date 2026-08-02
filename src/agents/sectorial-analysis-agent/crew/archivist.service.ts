@@ -2,6 +2,7 @@ import { Document } from '@langchain/core/documents';
 import { Embeddings } from '@langchain/core/embeddings';
 import { VectorStore } from '@langchain/core/vectorstores';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
 import { SECTORIAL_VECTOR_STORE } from 'src/langchain-core.module';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class ArchivistService {
   constructor(
     @Inject(SECTORIAL_VECTOR_STORE) private readonly vectorStore: VectorStore,
     private readonly embeddings: Embeddings,
+    private readonly broaderReportsService: BroaderReportsService,
   ) {}
 
   async storeRawData(sector: string, rawData: string): Promise<void> {
@@ -28,6 +30,7 @@ export class ArchivistService {
       new Document({ pageContent: finalReport, metadata: { sector } }),
     ];
     await this.vectorStore.addDocuments(documents);
+    await this.broaderReportsService.save('sectorial', sector, finalReport);
     this.logger.log('Final report successfully archived.');
   }
 

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-interface WatchlistItem {
+export interface WatchlistItem {
   ticker: string;
   region?: string;
   sector?: string;

@@ -208,6 +208,23 @@ export class ArchivistAgentService implements OnModuleInit {
   }
 
   /**
+   * Lists archived reports, most recent first, optionally filtered by ticker.
+   * @param ticker Optional ticker to filter by.
+   */
+  async listReports(ticker?: string): Promise<ReportDocument[]> {
+    const filter = ticker ? { ticker } : {};
+    return this.reportModel.find(filter).select('-vector').sort({ date: -1 }).exec();
+  }
+
+  /**
+   * Retrieves a single archived report by id.
+   * @param id The Mongo document id.
+   */
+  async getReportById(id: string): Promise<ReportDocument | null> {
+    return this.reportModel.findById(id).select('-vector').exec();
+  }
+
+  /**
    * Retrieves relevant reports using the appropriate database for the environment.
    * @param query The user's search query.
    * @returns A JSON string of the most relevant reports.

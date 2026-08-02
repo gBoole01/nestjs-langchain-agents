@@ -121,13 +121,18 @@ export class SectorialAnalysisAgentService implements OnModuleInit {
   }
 
   /**
+   * Lists every sector monitored via data/sectors.json.
+   */
+  listSectors(): { sector: string }[] {
+    const filePath = join(__dirname, '..', '..', '..', 'data', 'sectors.json');
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  }
+
+  /**
    * Runs the full workflow for every sector listed in data/sectors.json.
    */
   async runAnalysisForAllSectors(): Promise<void> {
-    const filePath = join(__dirname, '..', '..', '..', 'data', 'sectors.json');
-    const sectors: { sector: string }[] = JSON.parse(
-      readFileSync(filePath, 'utf-8'),
-    );
+    const sectors = this.listSectors();
     for (const { sector } of sectors) {
       await this.runAnalysis(sector);
     }

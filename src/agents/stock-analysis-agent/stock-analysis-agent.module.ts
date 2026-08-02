@@ -19,6 +19,7 @@ import { PortfolioAnalystAgentService } from './crew/portfolio-analyst.service';
 import { WriterAgentService } from './crew/writer-agent.service';
 import { Report, ReportSchema } from './models/reports.model';
 import { StockAnalysisAgentGraphService } from './stock-analysis-agent-graph.service';
+import { StockAnalysisAgentController } from './stock-analysis-agent.controller';
 import { StockAnalysisAgentService } from './stock-analysis-agent.service';
 
 @Module({
@@ -35,6 +36,7 @@ import { StockAnalysisAgentService } from './stock-analysis-agent.service';
     SectorialAnalysisAgentModule,
     MongooseModule.forFeature([{ name: Report.name, schema: ReportSchema }]),
   ],
+  controllers: [StockAnalysisAgentController],
   providers: [
     StockAnalysisAgentGraphService,
     StockAnalysisAgentService,
@@ -46,6 +48,10 @@ import { StockAnalysisAgentService } from './stock-analysis-agent.service';
     PortfolioAnalystAgentService,
     ArchivistAgentService,
   ],
-  exports: [StockAnalysisAgentService, StockAnalysisAgentGraphService],
+  exports: [
+    StockAnalysisAgentService,
+    StockAnalysisAgentGraphService,
+    PortfolioAnalystAgentService,
+  ],
 })
 export class StockAnalysisAgentModule {}

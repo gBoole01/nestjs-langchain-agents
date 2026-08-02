@@ -121,9 +121,9 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
   }
 
   /**
-   * Runs the full workflow for every region listed in data/geographies.json.
+   * Lists every region monitored via data/geographies.json.
    */
-  async runAnalysisForAllRegions(): Promise<void> {
+  listRegions(): { region: string }[] {
     const filePath = join(
       __dirname,
       '..',
@@ -132,9 +132,14 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
       'data',
       'geographies.json',
     );
-    const geographies: { region: string }[] = JSON.parse(
-      readFileSync(filePath, 'utf-8'),
-    );
+    return JSON.parse(readFileSync(filePath, 'utf-8'));
+  }
+
+  /**
+   * Runs the full workflow for every region listed in data/geographies.json.
+   */
+  async runAnalysisForAllRegions(): Promise<void> {
+    const geographies = this.listRegions();
     for (const { region } of geographies) {
       await this.runAnalysis(region);
     }

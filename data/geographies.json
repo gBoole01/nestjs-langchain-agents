@@ -1,6 +1,26 @@
 [
-    { "region": "United States" },
-    { "region": "Europe" },
-    { "region": "Germany" },
-    { "region": "Global" }
+  { "region": "North America", "group": "North America" },
+  { "region": "United States", "group": "North America" },
+  { "region": "Canada", "group": "North America" },
+
+  { "region": "Europe", "group": "Europe" },
+  { "region": "Eurozone", "group": "Europe" },
+  { "region": "United Kingdom", "group": "Europe" },
+  { "region": "Switzerland", "group": "Europe" },
+  { "region": "Nordics", "group": "Europe" },
+
+  { "region": "Asia-Pacific (APAC)", "group": "Asia-Pacific (APAC)" },
+  { "region": "Japan", "group": "Asia-Pacific (APAC)" },
+  { "region": "Australia", "group": "Asia-Pacific (APAC)" },
+  { "region": "Singapore", "group": "Asia-Pacific (APAC)" },
+  { "region": "Hong Kong", "group": "Asia-Pacific (APAC)" },
+
+  { "region": "Emerging Markets (EM)", "group": "Emerging Markets (EM)" },
+  { "region": "China", "group": "Emerging Markets (EM)" },
+  { "region": "India", "group": "Emerging Markets (EM)" },
+  { "region": "Brazil", "group": "Emerging Markets (EM)" },
+  { "region": "Taiwan", "group": "Emerging Markets (EM)" },
+  { "region": "South Korea", "group": "Emerging Markets (EM)" },
+
+  { "region": "Global / Macro Aggregate", "group": "Global / Macro Aggregate" }
 ]

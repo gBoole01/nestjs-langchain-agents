@@ -8,7 +8,6 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CatalogService } from './catalog.service';
 import { CreateHoldingDto } from './dto/create-holding.dto';
 import { CreateWatchlistItemDto } from './dto/create-watchlist-item.dto';
 import { UpdateHoldingDto } from './dto/update-holding.dto';
@@ -16,10 +15,7 @@ import { PortfolioService } from './portfolio.service';
 
 @Controller('portfolio')
 export class PortfolioController {
-  constructor(
-    private readonly portfolioService: PortfolioService,
-    private readonly catalogService: CatalogService,
-  ) {}
+  constructor(private readonly portfolioService: PortfolioService) {}
 
   @Get()
   findAll() {
@@ -29,11 +25,6 @@ export class PortfolioController {
   @Get('watchlist')
   findWatchlist() {
     return this.portfolioService.findWatchlist();
-  }
-
-  @Get('catalog')
-  findCatalog() {
-    return this.catalogService.findAll();
   }
 
   @Post()

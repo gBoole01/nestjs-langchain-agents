@@ -65,9 +65,7 @@ export class StockAnalysisAgentController {
     const alreadyRunFlags = await Promise.all(
       dto.tickers.map((ticker) => this.hasAlreadyRunToday(ticker)),
     );
-    const alreadyRun = dto.tickers.filter(
-      (_, index) => alreadyRunFlags[index],
-    );
+    const alreadyRun = dto.tickers.filter((_, index) => alreadyRunFlags[index]);
     if (alreadyRun.length > 0) {
       throw new ConflictException(
         `Analysis already run today for: ${alreadyRun.join(', ')}`,

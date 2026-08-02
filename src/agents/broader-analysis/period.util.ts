@@ -58,11 +58,7 @@ export function addPeriods(period: string, delta: number): string {
 export function getCurrentPeriod(cadence: Cadence, now = new Date()): string {
   const month = now.getUTCMonth(); // 0-11
   const index =
-    cadence === 'semester'
-      ? month < 6
-        ? 1
-        : 2
-      : Math.floor(month / 3) + 1;
+    cadence === 'semester' ? (month < 6 ? 1 : 2) : Math.floor(month / 3) + 1;
   return formatPeriod({ year: now.getUTCFullYear(), index, cadence });
 }
 

@@ -46,13 +46,10 @@ export class GlobalAnalysisAgentController {
         'A global analysis backfill is already in progress',
       );
     }
-    return this.analysisRunsService.start(
-      'global-analysis-backfill',
-      dto,
-      () =>
-        this.globalAnalysisAgentService
-          .backfill(dto.from, dto.to)
-          .then((summary) => JSON.stringify(summary)),
+    return this.analysisRunsService.start('global-analysis-backfill', dto, () =>
+      this.globalAnalysisAgentService
+        .backfill(dto.from, dto.to)
+        .then((summary) => JSON.stringify(summary)),
     );
   }
 

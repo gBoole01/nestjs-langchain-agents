@@ -10,6 +10,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DiscordModule } from './integrations/discord/discord.module';
 import { RunsModule } from './runs/runs.module';
+import { CatalogModule } from './tools/catalog/catalog.module';
 import { MarketDataModule } from './tools/market-data/market-data.module';
 import { PortfolioModule } from './tools/portfolio/portfolio.module';
 import { SerperModule } from './tools/serper/serper.module';
@@ -85,6 +86,7 @@ import { WebScrapingModule } from './tools/web-scraping/web-scraping.module';
     TiingoModule,
     MarketDataModule,
     PortfolioModule,
+    CatalogModule,
     StockAnalysisAgentModule,
     GlobalAnalysisAgentModule,
   ],

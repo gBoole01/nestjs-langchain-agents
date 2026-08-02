@@ -29,7 +29,9 @@ export class GeographicalAnalysisAgentController {
   @Post('runs')
   @HttpCode(202)
   async run(@Body() dto: RunGeoAnalysisDto): Promise<RunRecord> {
-    if (await this.geographicalAnalysisAgentService.hasFreshReport(dto.region)) {
+    if (
+      await this.geographicalAnalysisAgentService.hasFreshReport(dto.region)
+    ) {
       throw new ConflictException(
         `Geographical analysis for ${dto.region} has already run within the last 3 months`,
       );
@@ -52,9 +54,7 @@ export class GeographicalAnalysisAgentController {
   @Post('backfill')
   @HttpCode(202)
   backfill(@Body() dto: BackfillGeoDto): RunRecord {
-    if (
-      this.analysisRunsService.hasPendingRun('geo-analysis-backfill')
-    ) {
+    if (this.analysisRunsService.hasPendingRun('geo-analysis-backfill')) {
       throw new ConflictException(
         'A geographical analysis backfill is already in progress',
       );

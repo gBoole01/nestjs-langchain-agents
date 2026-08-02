@@ -57,21 +57,21 @@ describe('period.util', () => {
 
   describe('getCurrentPeriod', () => {
     it('resolves the correct semester', () => {
-      expect(getCurrentPeriod('semester', new Date('2026-08-02T00:00:00Z'))).toBe(
-        '2026-S2',
-      );
-      expect(getCurrentPeriod('semester', new Date('2026-01-15T00:00:00Z'))).toBe(
-        '2026-S1',
-      );
+      expect(
+        getCurrentPeriod('semester', new Date('2026-08-02T00:00:00Z')),
+      ).toBe('2026-S2');
+      expect(
+        getCurrentPeriod('semester', new Date('2026-01-15T00:00:00Z')),
+      ).toBe('2026-S1');
     });
 
     it('resolves the correct quarter', () => {
-      expect(getCurrentPeriod('quarter', new Date('2026-08-02T00:00:00Z'))).toBe(
-        '2026-Q3',
-      );
-      expect(getCurrentPeriod('quarter', new Date('2026-12-31T00:00:00Z'))).toBe(
-        '2026-Q4',
-      );
+      expect(
+        getCurrentPeriod('quarter', new Date('2026-08-02T00:00:00Z')),
+      ).toBe('2026-Q3');
+      expect(
+        getCurrentPeriod('quarter', new Date('2026-12-31T00:00:00Z')),
+      ).toBe('2026-Q4');
     });
   });
 

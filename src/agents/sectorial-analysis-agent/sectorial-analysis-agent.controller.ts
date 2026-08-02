@@ -57,13 +57,10 @@ export class SectorialAnalysisAgentController {
         'A sectorial analysis backfill is already in progress',
       );
     }
-    return this.analysisRunsService.start(
-      'sector-analysis-backfill',
-      dto,
-      () =>
-        this.sectorialAnalysisAgentService
-          .backfillAllSectors(dto.from, dto.to, dto.sectors)
-          .then((summary) => JSON.stringify(summary)),
+    return this.analysisRunsService.start('sector-analysis-backfill', dto, () =>
+      this.sectorialAnalysisAgentService
+        .backfillAllSectors(dto.from, dto.to, dto.sectors)
+        .then((summary) => JSON.stringify(summary)),
     );
   }
 

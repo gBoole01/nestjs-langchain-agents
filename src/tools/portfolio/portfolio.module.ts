@@ -1,7 +1,6 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { CatalogService } from './catalog.service';
 import { Holding, HoldingSchema } from './models/holding.model';
 import {
   WatchedTicker,
@@ -20,7 +19,7 @@ import { PortfolioTool } from './portfolio.tool';
     ]),
   ],
   controllers: [PortfolioController],
-  providers: [PortfolioService, CatalogService, PortfolioTool, Logger],
-  exports: [PortfolioService, CatalogService, PortfolioTool],
+  providers: [PortfolioService, PortfolioTool, Logger],
+  exports: [PortfolioService, PortfolioTool],
 })
 export class PortfolioModule {}

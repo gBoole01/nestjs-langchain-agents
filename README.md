@@ -54,7 +54,7 @@ npm run start:dev
   - Report
   - Overall Sentiment (Positive, Negative, Neutral)
   - Raising Trend (Up, Down, No Change)
-- [ ] On broader analysis, return a structured response to enhance the vector chunking and allow split displays on the frontend
+- [x] On broader analysis, return a structured response to enhance the vector chunking and allow split displays on the frontend
 - [ ] Create a new agent to analyze the portfolio and return a structured response to enhance the vector chunking and allow split displays on the frontend
 - [ ] Self-Correction with LLM Tools
 - [ ] Add planner agent to stock analysis

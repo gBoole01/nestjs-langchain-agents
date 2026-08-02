@@ -6,6 +6,11 @@ import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
+import {
+  broaderReportSchema,
+  BroaderReportSections,
+} from 'src/agents/broader-analysis/broader-report.types';
+import { renderBroaderReportMarkdown } from 'src/agents/broader-analysis/broader-report.util';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
@@ -67,7 +72,7 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
       period: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
-      finalReport: Annotation<string>(),
+      finalReport: Annotation<BroaderReportSections>(),
     });
 
     this.workflow = new StateGraph(GeographicalAnalysisState)
@@ -112,14 +117,16 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
             'Please write a well-structured and insightful economic outlook report for {region} for {period_label}.',
           ],
         ]);
-        const chain = prompt.pipe(this.model);
+        const chain = prompt.pipe(
+          this.model.withStructuredOutput(broaderReportSchema),
+        );
         const finalReport = await chain.invoke({
           region: state.region,
           period_label: getPeriodLabel(state.period),
           raw_data: state.rawData,
           historical_context: state.historicalContext,
         });
-        return { finalReport: finalReport.content };
+        return { finalReport };
       })
 
       .addNode('archive_final_report', async (state) => {
@@ -178,7 +185,13 @@ export class GeographicalAnalysisAgentService implements OnModuleInit {
     );
     const result = await this.workflow.invoke({ region, period });
     this.logger.log('Geographical analysis complete.');
-    return result.finalReport || 'No report generated.';
+    return result.finalReport
+      ? renderBroaderReportMarkdown(
+          region,
+          getPeriodLabel(period),
+          result.finalReport,
+        )
+      : 'No report generated.';
   }
 
   /**

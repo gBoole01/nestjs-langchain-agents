@@ -4,6 +4,11 @@ import { Annotation, END, StateGraph } from '@langchain/langgraph';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BroaderReportsService } from 'src/agents/broader-analysis/broader-reports.service';
+import {
+  broaderReportSchema,
+  BroaderReportSections,
+} from 'src/agents/broader-analysis/broader-report.types';
+import { renderBroaderReportMarkdown } from 'src/agents/broader-analysis/broader-report.util';
 import { geminiOnFailedAttempt } from 'src/common/llm/gemini-rate-limit-retry.util';
 import { AnalysisRunsService } from 'src/runs/analysis-runs.service';
 import { ArchivistService } from './crew/archivist.service';
@@ -60,7 +65,7 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
       period: Annotation<string>(),
       rawData: Annotation<string>(),
       historicalContext: Annotation<string>(),
-      finalReport: Annotation<string>(),
+      finalReport: Annotation<BroaderReportSections>(),
     });
 
     // The entire workflow is built in a single, chained sequence
@@ -105,13 +110,15 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
             'Please write a well-structured and insightful global economic outlook report for {period_label}.',
           ],
         ]);
-        const chain = prompt.pipe(this.model);
+        const chain = prompt.pipe(
+          this.model.withStructuredOutput(broaderReportSchema),
+        );
         const finalReport = await chain.invoke({
           period_label: getPeriodLabel(state.period),
           raw_data: state.rawData,
           historical_context: state.historicalContext,
         });
-        return { finalReport: finalReport.content };
+        return { finalReport };
       })
 
       // Node 4: Archive the final report
@@ -160,7 +167,13 @@ export class GlobalAnalysisAgentService implements OnModuleInit {
     this.logger.log(`Running global analysis for ${period}...`);
     const result = await this.workflow.invoke({ period });
     this.logger.log('Global analysis complete.');
-    return result.finalReport || 'No report generated.';
+    return result.finalReport
+      ? renderBroaderReportMarkdown(
+          GLOBAL_ANALYSIS_SUBJECT,
+          getPeriodLabel(period),
+          result.finalReport,
+        )
+      : 'No report generated.';
   }
 
   /**

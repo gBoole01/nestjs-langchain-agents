@@ -5,6 +5,18 @@ export type BroaderReportDomain = 'global' | 'geographical' | 'sectorial';
 
 export type BroaderReportDocument = BroaderReport & Document;
 
+@Schema({ _id: false })
+export class BroaderReportSection {
+  @Prop({ required: true })
+  heading: string;
+
+  @Prop({ required: true })
+  content: string;
+}
+
+export const BroaderReportSectionSchema =
+  SchemaFactory.createForClass(BroaderReportSection);
+
 @Schema({ timestamps: true })
 export class BroaderReport {
   @Prop({ required: true, enum: ['global', 'geographical', 'sectorial'] })
@@ -13,8 +25,8 @@ export class BroaderReport {
   @Prop({ required: true })
   subject: string;
 
-  @Prop({ required: true })
-  reportContent: string;
+  @Prop({ type: [BroaderReportSectionSchema], required: true })
+  sections: BroaderReportSection[];
 
   @Prop({ required: true })
   date: Date;

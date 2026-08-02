@@ -6,6 +6,7 @@ import {
   BroaderReportDocument,
   BroaderReportDomain,
 } from './models/broader-report.model';
+import { BroaderReportSections } from './broader-report.types';
 import { getPeriodBounds } from './period.util';
 
 @Injectable()
@@ -18,13 +19,13 @@ export class BroaderReportsService {
   async save(
     domain: BroaderReportDomain,
     subject: string,
-    reportContent: string,
+    sections: BroaderReportSections['sections'],
     period: string,
   ): Promise<void> {
     await this.broaderReportModel.create({
       domain,
       subject,
-      reportContent,
+      sections,
       period,
       date: getPeriodBounds(period).end,
     });
